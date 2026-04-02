@@ -3,11 +3,27 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Trophy, Star, ArrowUpRight, Sparkles, Quote, History, BrainCircuit, Activity, Package, Gamepad2 } from 'lucide-react';
 
+/* 아바타 개발을 위한 임시 작업 DB 작업후 수정 필요 */
+import { MOCK_ITEMS } from '../data/Avatar';
+import { fakeDraw } from '../utils/fakeDraw';
+
 export default function Jar() {
   const { user, emotions = [], collection = [], fetchHistory, fetchMe, fetchCollection, drawItem, toggleEquip } = useStore();
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [lastDrawnItem, setLastDrawnItem] = useState<any>(null);
-  
+  const [phase, setPhase] = useState<
+   'idle' | 'egg' | 'shake' | 'flash' | 'crack' | 'reveal'
+   >('idle');
+
+   const [result, setResult] = useState<any>(null);
+   const [drawGrade, setDrawGrade] = useState<string | null>(null);
+   const [isDrawing, setIsDrawing] = useState(false);
+   const [lastDrawnItem, setLastDrawnItem] = useState<any>(null);
+   const gradeSequence = {
+   common: ['common'],
+   rare: ['common','rare'],
+   unique: ['common','rare','unique'],
+   epic: ['common','rare','unique','epic']
+   };
+  const [flashStep, setFlashStep] = useState(0);
   useEffect(() => {
     if (user) {
       fetchHistory();
@@ -17,22 +33,83 @@ export default function Jar() {
   }, [user?.id]);
 
   const handleDraw = async () => {
-    if ((user?.current_candy_count || 0) < 1) {
-       alert("캔디가 부족해요! 리플렉션을 작성해서 캔디를 모아보세요. 🍬");
-       return;
-    }
-    setIsDrawing(true);
-    const res = await drawItem();
-    if (res.success) {
-       setLastDrawnItem(res.item);
-       setTimeout(() => setLastDrawnItem(null), 3000);
-    } else {
-       alert(res.message);
-    }
-    setIsDrawing(false);
+   if (isDrawing) return;
+   setIsDrawing(true);
+
+   //  if ((user?.current_candy_count || 0) < 2) {
+   //     alert("캔디가 부족해요! 리플렉션을 작성해서 캔디를 모아보세요. 🍬");
+   //     setIsDrawing(false);
+   //     return;
+   //  }
+
+    // DB호출 함수 임시로 주석 처리
+   //  const res = await drawItem();
+   //  if (res.success) {
+   //     setLastDrawnItem(res.item);
+   //     setTimeout(() => setLastDrawnItem(null), 3000);
+   //  } else {
+   //     alert(res.message);
+   //  }
+
+   // 임시 fakeDraw 사용
+   const res = fakeDraw(collection);
+
+   if (!res.success) {
+      alert(res.message);
+      setIsDrawing(false);
+      return;
+   }
+
+   // 결과 저장
+   setResult(res.item);
+   setDrawGrade(res.item.grade);
+
+   // 알 등장
+   setPhase('egg');
+
+   // 흔들림
+   setTimeout(() => {
+      setPhase('shake');
+   }, 600);
+
+   // 깨짐
+   setTimeout(()=> {
+      setPhase('crack');
+   }, 1100);
+
+   // 등급별 번쩍임
+   const sequence = gradeSequence[res.item.grade];
+   const flashDuration = sequence.length * 750;
+
+   sequence.forEach((grade, index) => {
+   setTimeout(() => {
+      setDrawGrade(grade);
+      setPhase('flash');
+   }, 1500 + index * 750);
+   });
+
+   // 결과 등장
+   setTimeout(() => {
+      setPhase('reveal');
+   }, 1900+ flashDuration);
+
+   // 종료
+   setTimeout(() => {
+      setPhase('idle');
+      setResult(null);
+      setIsDrawing(false);
+   }, 4500 + flashDuration);
   };
 
   const equippedItems = useMemo(() => collection.filter(i => i.is_equipped), [collection]);
+// 알 꺠는 색상 표시
+  const gradeColor = {
+   common: "#ffffff",
+   rare: "#60a5fa",
+   unique: "#a78bfa",
+   epic: "#fd4d08"
+   };
+  const currentColor = drawGrade ? gradeColor[drawGrade] : "#ffffff";
 
   const graphData = useMemo(() => {
     return [...emotions].reverse().slice(-7).map((item) => ({
@@ -104,7 +181,7 @@ export default function Jar() {
                   }`}
                 >
                   <Sparkles className={isDrawing ? "animate-spin" : "text-brand-yellow"} size={18} />
-                  {isDrawing ? "뽑는 중..." : "캔디 1개로 랜덤 뽑기"}
+                  {isDrawing ? "뽑는 중..." : "캔디 2개로 랜덤 뽑기"}
                 </motion.button>
              </div>
 
@@ -223,6 +300,126 @@ export default function Jar() {
           </section>
         </main>
       </div>
+      <AnimatePresence>
+      {phase !== 'idle' && (
+      <motion.div
+         className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+         initial={{ opacity: 0 }}
+         animate={{ opacity: 1 }}
+         exit={{ opacity: 0 }}
+      >
+         
+         {/* 번쩍 빛 */}
+         {phase === 'flash' && (
+         <motion.div
+            key={currentColor}
+            className="absolute w-96 h-96 rounded-full blur-3xl"
+            style={{ background: currentColor }}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{
+               scale: [0.5, 2.2, 2.8],
+               opacity: [0, 1, 0]
+            }}
+            transition={{
+               duration: 0.35,
+               ease: "easeOut"
+            }}
+         />
+         )}
+
+         {/* 알 */}
+         {phase !== 'reveal' && (
+         <motion.div
+            animate={
+               phase === 'shake'
+               ? { rotate: [0, -10, 10, -8, 8, 0] }
+
+               : phase === 'flash'
+               ? {
+                  opacity: 0.35,
+                  scale: 0.95
+               }
+               
+               : phase === 'crack'
+               ? {
+                     scale:[1,1.05,0.95,0],
+                     opacity:[1,1,0]
+                  }
+               : {}
+            }
+            transition={{ duration: 0.6 }}
+            className="relative"
+         >
+
+            {/* 알 */}
+            <div className="w-40 h-52 bg-white rounded-full shadow-2xl border-4 border-white" />
+
+            {/* 지그재그 금 */}
+            {phase !== 'egg' && phase !== 'shake' && (
+            <motion.svg
+               className="absolute inset-0 w-full h-full"
+               viewBox="0 0 100 120"
+               initial={{ pathLength: 0, opacity: 0 }}
+               animate={{ pathLength: 1, opacity: 1 }}
+               transition={{ duration: 0.25 }}
+            >
+               <motion.path
+                  d="M10 60 
+                     L25 55 
+                     L40 65 
+                     L55 55 
+                     L70 65 
+                     L85 60"
+                  stroke="gray"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+               />
+            </motion.svg>
+            )}
+
+         </motion.div>
+         )}
+
+         {/* 결과 카드 */}
+         {phase === 'reveal' && result && (
+         <>
+            {/* glow */}
+            <motion.div
+               className="absolute w-72 h-72 rounded-full blur-3xl"
+               style={{ background: currentColor }}
+               initial={{ scale: 0.5, opacity: 0 }}
+               animate={{ scale: 1.6, opacity: 0.6 }}
+               transition={{ duration: 0.6 }}
+            />
+
+            {/* 카드 */}
+            <motion.div
+               initial={{ scale: 0.2, opacity: 0, rotate:-10 }}
+               animate={{ scale: 1, opacity: 1, rotate:0 }}
+               transition={{ type: "spring", stiffness: 200 }}
+               className="absolute flex flex-col items-center"
+            >
+               <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl text-center">
+               <div className="text-xs text-gray-400 mb-1">
+                  NEW ITEM
+               </div>
+
+               <div className="text-lg font-bold">
+                  {result.name}
+               </div>
+
+               <div className="text-sm text-gray-500">
+                  {result.grade}
+               </div>
+               </div>
+            </motion.div>
+         </>
+         )}
+
+      </motion.div>
+      )}
+      </AnimatePresence>
     </motion.div>
   );
 }
