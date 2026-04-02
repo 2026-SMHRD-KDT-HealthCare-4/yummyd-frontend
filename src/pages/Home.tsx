@@ -112,6 +112,9 @@ const AdminDashboard = () => {
            </div>
            <div className="flex items-center gap-3">
               <h2 className="text-3xl font-black text-brand-primary tracking-tight">Management</h2>
+              <Link to="/inboard" className="p-1 hover:bg-brand-surface rounded-lg transition-colors text-brand-primary/40 flex items-center gap-1 text-xs font-bold">
+                 상세 대시보드 <ArrowRight size={14} />
+              </Link>
               <Link to="/settings" className="p-1 hover:bg-brand-surface rounded-lg transition-colors text-brand-primary/40">
                  <Settings size={22} />
               </Link>
