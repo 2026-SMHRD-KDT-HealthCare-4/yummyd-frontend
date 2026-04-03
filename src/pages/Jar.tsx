@@ -113,9 +113,9 @@ export default function Jar() {
 
   const graphData = useMemo(() => {
     return [...emotions].reverse().slice(-7).map((item) => ({
-      day: new Date(item.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-      value: (item.EmotionLog?.happy_prob * 100) || 50,
-      dominant: item.EmotionLog?.dominant_emotion || 'stable'
+      day: new Date(item.created_at).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
+      value: (item.happy_prob * 100) || 50,
+      dominant: item.rep_emotion || 'stable'
     }));
   }, [emotions]);
 
@@ -288,10 +288,10 @@ export default function Jar() {
              <div className="space-y-4">
                 {emotions.slice(0, 3).map((item, idx) => (
                   <motion.div key={idx} whileHover={{ x: 10 }} className="flex items-center gap-8 p-6 bg-brand-surface/10 rounded-[2.5rem] border border-transparent hover:border-brand-primary/5 transition-all group">
-                     <div className={`w-3 h-10 rounded-full ${item.EmotionLog?.dominant_emotion === 'happy' ? 'bg-brand-mint' : 'bg-brand-pink'} shrink-0`} />
+                     <div className={`w-3 h-10 rounded-full ${item.rep_emotion === 'happy' ? 'bg-brand-mint' : 'bg-brand-pink'} shrink-0`} />
                      <div className="flex-1">
-                        <span className="text-[10px] font-black text-brand-primary/40 uppercase">{new Date(item.createdAt).toLocaleDateString()}</span>
-                        <p className="text-base font-bold text-brand-primary truncate">{item.original_text}</p>
+                        <span className="text-[10px] font-black text-brand-primary/40 uppercase">{new Date(item.created_at).toLocaleDateString()}</span>
+                        <p className="text-base font-bold text-brand-primary truncate">{item.origin_text}</p>
                      </div>
                      <ArrowUpRight size={20} className="text-brand-primary/10 group-hover:text-brand-primary" />
                   </motion.div>

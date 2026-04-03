@@ -8,27 +8,27 @@ import { motion } from 'framer-motion';
 const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout, setUser } = useStore();
-  const [groups, setGroups] = React.useState<any[]>([]);
-  const [selectedGroup, setSelectedGroup] = React.useState<string>(user?.group_id?.toString() || '');
+  const [classes, setClasses] = React.useState<any[]>([]);
+  const [selectedClass, setSelectedClass] = React.useState<string>(user?.class_id?.toString() || '');
 
-  // 내 기관의 그룹 목록 로드
+  // 내 기관의 클래스 목록 로드
   React.useEffect(() => {
     if (user?.role === 'student' && user?.institution_id) {
-      axios.get(`/api/groups/list?institution_id=${user.institution_id}`).then(res => {
-        if (res.data.success) setGroups(res.data.groups);
+      axios.get(`/api/classes/list?institution_id=${user.institution_id}`).then(res => {
+        if (res.data.success) setClasses(res.data.classes);
       });
     }
   }, [user]);
 
-  const handleUpdateGroup = async () => {
+  const handleUpdateClass = async () => {
     try {
-      const res = await axios.patch('/api/auth/update-profile', { group_id: selectedGroup });
+      const res = await axios.patch('/api/auth/update-profile', { class_id: selectedClass });
       if (res.data.success) {
-        alert('소속 그룹이 변경되었습니다.');
-        setUser({ ...user, group_id: parseInt(selectedGroup) });
+        alert('소속 클래스가 변경되었습니다.');
+        setUser({ ...user, class_id: parseInt(selectedClass) });
       }
     } catch (err) {
-      alert('그룹 변경에 실패했습니다.');
+      alert('클래스 변경에 실패했습니다.');
     }
   };
 
@@ -71,25 +71,25 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* Group Management (For Students) */}
+        {/* Class Management (For Students) */}
         {user.role === 'student' && (
           <div className="bg-white p-8 rounded-[3rem] border border-brand-surface shadow-xl space-y-4">
              <h4 className="font-black text-brand-primary flex items-center gap-2">
-                <BookOpen size={20} className="text-brand-mint" /> 소속 그룹 설정
+                <BookOpen size={20} className="text-brand-mint" /> 소속 클래스 설정
              </h4>
              <div className="flex gap-3">
                <select 
-                 value={selectedGroup}
-                 onChange={(e) => setSelectedGroup(e.target.value)}
+                 value={selectedClass}
+                 onChange={(e) => setSelectedClass(e.target.value)}
                  className="flex-1 px-6 py-4 bg-brand-surface rounded-2xl border-none font-bold text-brand-primary"
                >
-                 <option value="">그룹 선택</option>
-                 {groups.map(g => (
+                 <option value="">클래스 선택</option>
+                 {classes.map(g => (
                    <option key={g.id} value={g.id}>{g.name}</option>
                  ))}
                </select>
                <button 
-                 onClick={handleUpdateGroup}
+                 onClick={handleUpdateClass}
                  className="px-6 bg-brand-primary text-white font-black rounded-2xl text-xs hover:bg-brand-primary/80 transition-all"
                >
                  저장

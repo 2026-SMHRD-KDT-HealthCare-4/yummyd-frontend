@@ -11,7 +11,6 @@ import Register from './pages/Register';
 import Settings from './pages/Settings';
 import Navbar from './components/Navbar';
 import Intro from './components/Intro';
-import YummyChat from './components/YummyChat'; // 🍭 챗봇 추가
 import { useStore } from './store/useStore';
 import { io } from 'socket.io-client'; // 🔌 소켓 클라이언트 추가
 import './App.css';
@@ -117,9 +116,6 @@ function App() {
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        
-        {/* 🍭 전역 챗봇 레이어 */}
-        {user && <YummyChat />}
       </div>
     </Router>
   );
