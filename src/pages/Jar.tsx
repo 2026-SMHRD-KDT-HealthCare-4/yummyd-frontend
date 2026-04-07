@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { Trophy, Star, ArrowUpRight, Sparkles, Quote, History, BrainCircuit, Activity, Package, Gamepad2 } from 'lucide-react';
 
 /* 아바타 개발을 위한 임시 작업 DB 작업후 수정 필요 */
-import { MOCK_ITEMS } from '../data/Avatar';
+// import { MOCK_ITEMS } from '../data/Avatar';
 import { fakeDraw } from '../utils/fakeDraw';
 
 export default function Jar() {
@@ -17,13 +17,15 @@ export default function Jar() {
    const [drawGrade, setDrawGrade] = useState<string | null>(null);
    const [isDrawing, setIsDrawing] = useState(false);
    const [lastDrawnItem, setLastDrawnItem] = useState<any>(null);
-   const gradeSequence = {
-   common: ['common'],
-   rare: ['common','rare'],
-   unique: ['common','rare','unique'],
-   epic: ['common','rare','unique','epic']
+   
+   type Grade = 'common' | 'rare' | 'unique' | 'epic';
+   const gradeSequence : Record<Grade, string[]>= {
+      common: ['common'],
+      rare: ['common','rare'],
+      unique: ['common','rare','unique'],
+      epic: ['common','rare','unique','epic']
    };
-  const [flashStep, setFlashStep] = useState(0);
+   const [flashLayers, setFlashLayers] = useState<string[]>([]);
   useEffect(() => {
     if (user) {
       fetchHistory();
@@ -62,7 +64,7 @@ export default function Jar() {
 
    // 결과 저장
    setResult(res.item);
-   setDrawGrade(res.item.grade);
+   setDrawGrade(res.item!.grade);
 
    // 알 등장
    setPhase('egg');
@@ -78,28 +80,34 @@ export default function Jar() {
    }, 1100);
 
    // 등급별 번쩍임
-   const sequence = gradeSequence[res.item.grade];
-   const flashDuration = sequence.length * 750;
 
-   sequence.forEach((grade, index) => {
-   setTimeout(() => {
-      setDrawGrade(grade);
-      setPhase('flash');
-   }, 1500 + index * 750);
+   const sequence = gradeSequence[res.item.grade as Grade];
+
+   sequence.forEach((g, index) => {
+      setTimeout(() => {
+         const grade = g as Grade;
+         const color = gradeColor[grade];
+
+         setDrawGrade(grade);
+         setFlashLayers(prev => [...prev, color]);
+
+         setPhase('flash');
+      }, 1500 + index * 1100);
    });
 
    // 결과 등장
    setTimeout(() => {
       setPhase('reveal');
-   }, 1900+ flashDuration);
+   }, 1900+ sequence.length * 1100);
 
    // 종료
    setTimeout(() => {
-      setPhase('idle');
-      setResult(null);
-      setIsDrawing(false);
-   }, 4500 + flashDuration);
-  };
+   setPhase('idle');
+   setResult(null);
+   setIsDrawing(false);
+   setFlashLayers([]);
+   }, 4500 + sequence.length * 1100);
+   };
 
   const equippedItems = useMemo(() => collection.filter(i => i.is_equipped), [collection]);
 // 알 꺠는 색상 표시
@@ -109,7 +117,7 @@ export default function Jar() {
    unique: "#a78bfa",
    epic: "#fd4d08"
    };
-  const currentColor = drawGrade ? gradeColor[drawGrade] : "#ffffff";
+  const currentColor = drawGrade ? gradeColor[drawGrade as keyof typeof gradeColor] : "#ffffff";
 
   const graphData = useMemo(() => {
     return [...emotions].reverse().slice(-7).map((item) => ({
@@ -309,24 +317,53 @@ export default function Jar() {
          exit={{ opacity: 0 }}
       >
          
-         {/* 번쩍 빛 */}
-         {phase === 'flash' && (
-         <motion.div
-            key={currentColor}
-            className="absolute w-96 h-96 rounded-full blur-3xl"
-            style={{ background: currentColor }}
-            initial={{ scale: 0.5, opacity: 0 }}
-            animate={{
-               scale: [0.5, 2.2, 2.8],
-               opacity: [0, 1, 0]
-            }}
-            transition={{
-               duration: 0.35,
-               ease: "easeOut"
-            }}
-         />
-         )}
+         {/* 빛 효과 */}
+         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+  <AnimatePresence> {/* mode="wait" 삭제: 빛이 겹치며 전환됨 */}
+    {phase === 'flash' && (
+      <motion.div
+        key={drawGrade} // 등급이 바뀔 때마다 새로운 레이어 생성
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ 
+          opacity: [0, 1, 0.8], 
+          scale: [0.8, 1.5, 1.2] 
+        }}
+        exit={{ opacity: 0, scale: 2, transition: { duration: 0.8 } }} // 서서히 커지며 사라짐
+        transition={{ duration: 1, ease: "easeOut" }}
+        className="absolute flex items-center justify-center"
+      >
+        {/* 1. 메인 부드러운 광원 (배경 색상 채우기) */}
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-60"
+          style={{ background: currentColor }}
+        />
 
+        {/* 2. 강력한 중앙 폭발 (번쩍이는 임팩트) */}
+        <motion.div
+          className="absolute w-[400px] h-[400px] rounded-full blur-[60px]"
+          style={{ background: `radial-gradient(circle, #ffffff 0%, ${currentColor} 70%)` }}
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.2, 1] }}
+          transition={{ duration: 0.5, ease: "backOut" }}
+        />
+
+        {/* 3. 빠르게 퍼져나가는 충격파 링 */}
+        <motion.div
+          className="absolute rounded-full border-[10px]"
+          style={{ borderColor: currentColor }}
+          initial={{ width: 100, height: 100, opacity: 1, borderWidth: "10px" }}
+          animate={{ 
+            width: 1000, 
+            height: 1000, 
+            opacity: 0, 
+            borderWidth: "1px" 
+          }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        />
+      </motion.div>
+    )}
+  </AnimatePresence>
+</div>
          {/* 알 */}
          {phase !== 'reveal' && (
          <motion.div
@@ -350,8 +387,6 @@ export default function Jar() {
             transition={{ duration: 0.6 }}
             className="relative"
          >
-
-            {/* 알 */}
             <div className="w-40 h-52 bg-white rounded-full shadow-2xl border-4 border-white" />
 
             {/* 지그재그 금 */}
@@ -384,39 +419,74 @@ export default function Jar() {
          {/* 결과 카드 */}
          {phase === 'reveal' && result && (
          <>
-            {/* glow */}
+            {/* 후광 */}
             <motion.div
-               className="absolute w-72 h-72 rounded-full blur-3xl"
+               className="absolute w-[500px] h-[500px] rounded-full blur-[120px]"
                style={{ background: currentColor }}
                initial={{ scale: 0.5, opacity: 0 }}
-               animate={{ scale: 1.6, opacity: 0.6 }}
-               transition={{ duration: 0.6 }}
+               animate={{ scale: 1.5, opacity: 0.4 }}
+               transition={{ duration: 0.8 }}
             />
 
-            {/* 카드 */}
+            {/* 실제 결과 카드 디자인 */}
             <motion.div
-               initial={{ scale: 0.2, opacity: 0, rotate:-10 }}
-               animate={{ scale: 1, opacity: 1, rotate:0 }}
-               transition={{ type: "spring", stiffness: 200 }}
-               className="absolute flex flex-col items-center"
+               initial={{ scale: 0.2, opacity: 0, rotate: -15, y: 50 }}
+               animate={{ scale: 1, opacity: 1, rotate: 0, y: 0 }}
+               transition={{ type: "spring", stiffness: 260, damping: 20 }}
+               className="relative z-50 flex flex-col items-center"
             >
-               <div className="bg-white px-6 py-4 rounded-2xl shadow-2xl text-center">
-               <div className="text-xs text-gray-400 mb-1">
-                  NEW ITEM
+               <div className="bg-white/90 backdrop-blur-md p-5 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-4 border-white w-80 overflow-hidden">
+               
+               {/* 🎬 미디어 영역: 비디오 우선, 없으면 이미지 */}
+               <div className="relative w-full aspect-square bg-gray-50 rounded-[2rem] overflow-hidden mb-6 shadow-inner flex items-center justify-center">
+                  {result.video_url ? (
+                     <video 
+                     src={result.video_url} 
+                     autoPlay 
+                     loop 
+                     muted 
+                     playsInline 
+                     className="w-full h-full object-cover"
+                     />
+                  ) : result.image_url ? (
+                     <img 
+                     src={result.image_url} 
+                     alt={result.name}
+                     className="w-full h-full object-contain p-4"
+                     />
+                  ) : (
+                     /* 데이터가 없을 때의 기본 아이콘 */
+                     <Sparkles size={60} className="text-brand-primary/20" />
+                  )}
+
+                  {/* 우상단 등급 라벨 */}
+                  <div 
+                     className="absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-black text-white shadow-lg"
+                     style={{ backgroundColor: currentColor }}
+                  >
+                     {result.grade.toUpperCase()}
+                  </div>
                </div>
 
-               <div className="text-lg font-bold">
-                  {result.name}
+               {/* 하단 텍스트 정보 */}
+               <div className="text-center pb-2">
+                  <p className="text-[11px] font-black text-brand-primary/30 uppercase tracking-[0.2em] mb-1">
+                     New Item Unlocked
+                  </p>
+                  <h2 className="text-2xl font-black text-brand-primary leading-tight mb-1">
+                     {result.name}
+                  </h2>
+                  <p className="text-[12px] font-bold opacity-50" style={{ color: currentColor }}>
+                     {result.grade === 'epic' ? '✨ Legendary Discovery ✨' : 'Collection Updated'}
+                  </p>
                </div>
-
-               <div className="text-sm text-gray-500">
-                  {result.grade}
                </div>
-               </div>
+               
+               {/* 바닥 그림자 효과 */}
+               <div className="w-40 h-6 bg-black/20 blur-xl rounded-full mt-8" />
             </motion.div>
          </>
          )}
-
       </motion.div>
       )}
       </AnimatePresence>

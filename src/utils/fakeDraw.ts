@@ -1,14 +1,24 @@
 /* data폴더와 동일하게 임시로 작업을 위한 로직 함수를 저장하기 위한 공간 */
 import { MOCK_ITEMS } from '../data/Avatar';
+type Grade = 'common' | 'rare' | 'unique' | 'epic';
 
-const RATE = {
-  common: 60,
-  rare: 25,
-  unique: 10,
-  epic: 5
+type Item = {
+  id: number;
+  name: string;
+  grade: 'common' | 'rare' | 'unique' | 'epic';
+  item_type?: string;
+  image_url?: string; // 추가
+  video_url?: string; // 추가
 };
 
-const getRandomGrade = () => {
+const RATE = {
+  common: 0,
+  rare: 0,
+  unique:20,
+  epic: 10
+};
+
+const getRandomGrade = (): Grade => {
   const rand = Math.random() * 100;
 
   if (rand < RATE.common) return "common";
@@ -17,10 +27,11 @@ const getRandomGrade = () => {
   return "epic";
 };
 
-export const fakeDraw = (collection: { id: number }[]) => {
+export const fakeDraw = (
+  collection: { id: number }[]
+): { success: boolean; item?: Item; message?: string } => {
   const ownedIds = collection.map(i => i.id);
 
-  // 보유하지 않은 아바타만 필터
   const available = MOCK_ITEMS.filter(item => !ownedIds.includes(item.id));
 
   if (available.length === 0) {
@@ -36,6 +47,10 @@ export const fakeDraw = (collection: { id: number }[]) => {
   }
 
   const item = pool[Math.floor(Math.random() * pool.length)];
+
+  if (!item) {
+    return { success: false, message: "아이템 생성 실패" };
+  }
 
   return { success: true, item };
 };
