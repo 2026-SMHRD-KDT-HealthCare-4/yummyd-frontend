@@ -1,5 +1,5 @@
 /* data폴더와 동일하게 임시로 작업을 위한 로직 함수를 저장하기 위한 공간 */
-import { MOCK_ITEMS } from '../data/Avatar';
+import { MOCK_ITEMS } from '../../../yummyd-backend/data/Avatar';
 type Grade = 'common' | 'rare' | 'unique' | 'epic';
 
 type Item = {

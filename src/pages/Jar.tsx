@@ -5,7 +5,6 @@ import { Trophy, Star, ArrowUpRight, Sparkles, Quote, History, BrainCircuit, Act
 
 /* 아바타 개발을 위한 임시 작업 DB 작업후 수정 필요 */
 // import { MOCK_ITEMS } from '../data/Avatar';
-import { fakeDraw } from '../utils/fakeDraw';
 
 export default function Jar() {
   const { user, emotions = [], collection = [], fetchHistory, fetchMe, fetchCollection, drawItem, toggleEquip } = useStore();
@@ -26,6 +25,15 @@ export default function Jar() {
       epic: ['common','rare','unique','epic']
    };
    const [flashLayers, setFlashLayers] = useState<string[]>([]);
+
+   // 알 꺠는 색상 표시
+  const gradeColor = {
+   common: "#ffffff",
+   rare: "#60a5fa",
+   unique: "#a78bfa",
+   epic: "#fd4d08"
+   };
+
   useEffect(() => {
     if (user) {
       fetchHistory();
@@ -35,88 +43,78 @@ export default function Jar() {
   }, [user?.id]);
 
   const handleDraw = async () => {
-   if (isDrawing) return;
-   setIsDrawing(true);
+  if (isDrawing) return;
+  setIsDrawing(true);
 
-   //  if ((user?.current_candy_count || 0) < 2) {
-   //     alert("캔디가 부족해요! 리플렉션을 작성해서 캔디를 모아보세요. 🍬");
-   //     setIsDrawing(false);
-   //     return;
-   //  }
+  // 캔디 부족 체크
+  if ((user?.current_candy_count || 0) < 2) {
+    alert("캔디가 부족해요! 리플렉션을 작성해서 캔디를 모아보세요. 🍬");
+    setIsDrawing(false);
+    return;
+  }
 
-    // DB호출 함수 임시로 주석 처리
-   //  const res = await drawItem();
-   //  if (res.success) {
-   //     setLastDrawnItem(res.item);
-   //     setTimeout(() => setLastDrawnItem(null), 3000);
-   //  } else {
-   //     alert(res.message);
-   //  }
+  // 아이템 뽑기
+  const res = await drawItem();
+  if (!res.success) {
+    alert(res.message);
+    setIsDrawing(false);
+    return;
+  }
 
-   // 임시 fakeDraw 사용
-   const res = fakeDraw(collection);
+  // 결과 세팅: phase 변경 전에 먼저
+  setResult(res.item);
+  setDrawGrade(res.item!.grade);
+  setLastDrawnItem(res.item);
+  setTimeout(() => setLastDrawnItem(null), 3000);
 
-   if (!res.success) {
-      alert(res.message);
-      setIsDrawing(false);
-      return;
-   }
+  // 단계별 시간 변수화
+  const gradeSequence: Record<Grade, string[]> = {
+    common: ["common"],
+    rare: ["common", "rare"],
+    unique: ["common", "rare", "unique"],
+    epic: ["common", "rare", "unique", "epic"],
+  };
+  const sequence = gradeSequence[res.item.grade as Grade];
 
-   // 결과 저장
-   setResult(res.item);
-   setDrawGrade(res.item!.grade);
+  const eggTime = 0;
+  const shakeTime = 600;
+  const crackTime = 1100;
+  const flashStart = 1500;
+  const revealTime = 1900 + sequence.length * 1100;
+  const endTime = 4500 + sequence.length * 1100;
 
-   // 알 등장
-   setPhase('egg');
+  // 알 등장
+  setTimeout(() => setPhase("egg"), eggTime);
 
-   // 흔들림
-   setTimeout(() => {
-      setPhase('shake');
-   }, 600);
+  // 흔들림
+  setTimeout(() => setPhase("shake"), shakeTime);
 
-   // 깨짐
-   setTimeout(()=> {
-      setPhase('crack');
-   }, 1100);
+  // 깨짐
+  setTimeout(() => setPhase("crack"), crackTime);
 
-   // 등급별 번쩍임
+  // 등급별 번쩍임
+  sequence.forEach((g, index) => {
+    setTimeout(() => {
+      setDrawGrade(g as Grade);
+      setFlashLayers((prev) => [...prev, gradeColor[g as Grade]]);
+      setPhase("flash");
+    }, flashStart + index * 1100);
+  });
 
-   const sequence = gradeSequence[res.item.grade as Grade];
+  // 결과 등장
+  setTimeout(() => setPhase("reveal"), revealTime);
 
-   sequence.forEach((g, index) => {
-      setTimeout(() => {
-         const grade = g as Grade;
-         const color = gradeColor[grade];
-
-         setDrawGrade(grade);
-         setFlashLayers(prev => [...prev, color]);
-
-         setPhase('flash');
-      }, 1500 + index * 1100);
-   });
-
-   // 결과 등장
-   setTimeout(() => {
-      setPhase('reveal');
-   }, 1900+ sequence.length * 1100);
-
-   // 종료
-   setTimeout(() => {
-   setPhase('idle');
-   setResult(null);
-   setIsDrawing(false);
-   setFlashLayers([]);
-   }, 4500 + sequence.length * 1100);
-   };
+  // 종료: 초기화
+  setTimeout(() => {
+    setPhase("idle");
+    setResult(null);
+    setIsDrawing(false);
+    setFlashLayers([]);
+  }, endTime);
+};
 
   const equippedItems = useMemo(() => collection.filter(i => i.is_equipped), [collection]);
-// 알 꺠는 색상 표시
-  const gradeColor = {
-   common: "#ffffff",
-   rare: "#60a5fa",
-   unique: "#a78bfa",
-   epic: "#fd4d08"
-   };
+
   const currentColor = drawGrade ? gradeColor[drawGrade as keyof typeof gradeColor] : "#ffffff";
 
   const graphData = useMemo(() => {
