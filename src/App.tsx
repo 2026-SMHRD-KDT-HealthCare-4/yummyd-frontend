@@ -24,6 +24,7 @@ function App() {
   const logout = useStore((state) => state.logout);
   const setAnalyzing = useStore((state) => state.setAnalyzing);
   const setAnalysisResult = useStore((state) => state.setAnalysisResult);
+  const fetchMe = useStore((state) => state.fetchMe);
   
   const [loading, setLoading] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
@@ -43,7 +44,7 @@ function App() {
           summary: data.summary,
           dominantEmotion: data.dominantEmotion
         });
-        // ✅ 여기서 알림 토스트 등을 띄울 수 있음
+        fetchMe(); // 캔디 카운트 갱신
         console.log("AI 분석 완료:", data);
       });
 
@@ -58,7 +59,7 @@ function App() {
       socket.off('analysis_completed');
       socket.off('analysis_failed');
     };
-  }, [user, setAnalyzing, setAnalysisResult]);
+  }, [user, setAnalyzing, setAnalysisResult, fetchMe]);
 
   const restoreSession = useCallback(async () => {
     const token = localStorage.getItem('yummy_token');
