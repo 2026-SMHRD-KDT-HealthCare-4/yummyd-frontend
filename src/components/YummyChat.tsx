@@ -36,8 +36,7 @@ export default function YummyChat() {
       const socket = socketRef.current;
 
       // 룸 접속 (강사/학생 구분)
-      const cohortId = user.role === 'student' ? user.cohort_id : 1;
-      socket.emit('join', { userId: user.id, cohortId });
+      socket.emit('join', { userId: user.id, classId: user.class_id ?? null });
 
       // [공통] 강사가 투표 시작했을 때
       socket.on('class_poll_started', (poll: any) => {
@@ -98,7 +97,7 @@ export default function YummyChat() {
     if (socketRef.current) {
       const options = type === 'understanding' ? ['완벽해요', '보통이에요', '모르겠어요'] : ['빨라요', '좋아요', '느려요'];
       setPollResults({});
-      socketRef.current.emit('instructor_poll', { cohortId: 1, questionType: type, options });
+      socketRef.current.emit('instructor_poll', { classId: user?.class_id ?? null, questionType: type, options });
       setMessages(prev => [...prev, { role: 'bot', text: `🚀 학생들에게 '${type === 'understanding' ? '이해도' : '진도'}' 체크 질문을 보냈습니다.` }]);
     }
   };
@@ -106,14 +105,14 @@ export default function YummyChat() {
   // --- 학생 기능 ---
   const sendQuickFeedback = (type: string, label: string) => {
     if (socketRef.current) {
-      socketRef.current.emit('student_alert', { cohortId: user?.cohort_id || 1, alertType: type });
+      socketRef.current.emit('student_alert', { classId: user?.class_id ?? null, alertType: type });
       setMessages(prev => [...prev, { role: 'user', text: `📢 강사님에게 알림 발송: "${label}"` }]);
     }
   };
 
   const submitPollResponse = (option: string) => {
     if (socketRef.current) {
-      socketRef.current.emit('student_response', { cohortId: user?.cohort_id || 1, userId: user?.id, response: option });
+      socketRef.current.emit('student_response', { classId: user?.class_id ?? null, userId: user?.id, response: option });
       setMessages(prev => [...prev, { role: 'user', text: `✅ 대답 완료: ${option}` }]);
       setActivePoll(null);
     }

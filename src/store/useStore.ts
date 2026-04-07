@@ -11,7 +11,7 @@ interface User {
   total_candy_count?: number;
   attendance_days?: number;
   streak?: number;
-  cohort_id?: number;
+  class_id?: number;
 }
 
 interface CandyPost {

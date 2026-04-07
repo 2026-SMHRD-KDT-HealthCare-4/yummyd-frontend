@@ -9,7 +9,7 @@ const Settings: React.FC = () => {
   const navigate = useNavigate();
   const { user, logout, setUser } = useStore();
   const [groups, setGroups] = React.useState<any[]>([]);
-  const [selectedGroup, setSelectedGroup] = React.useState<string>(user?.group_id?.toString() || '');
+  const [selectedGroup, setSelectedGroup] = React.useState<string>(user?.class_id?.toString() || '');
 
   // 내 기관의 클래스 목록 로드
   React.useEffect(() => {
@@ -22,13 +22,13 @@ const Settings: React.FC = () => {
 
   const handleUpdateGroup = async () => {
     try {
-      const res = await axios.patch('/api/auth/update-profile', { group_id: selectedGroup });
+      const res = await axios.patch('/api/auth/update-profile', { class_id: selectedGroup });
       if (res.data.success) {
-        alert('소속 그룹이 변경되었습니다.');
-        setUser({ ...user, group_id: parseInt(selectedGroup) });
+        alert('소속 클래스가 변경되었습니다.');
+        setUser({ ...user!, class_id: parseInt(selectedGroup) });
       }
     } catch (err) {
-      alert('그룹 변경에 실패했습니다.');
+      alert('클래스 변경에 실패했습니다.');
     }
   };
 
@@ -75,7 +75,7 @@ const Settings: React.FC = () => {
         {user.role === 'student' && (
           <div className="bg-white p-8 rounded-[3rem] border border-brand-surface shadow-xl space-y-4">
              <h4 className="font-black text-brand-primary flex items-center gap-2">
-                <BookOpen size={20} className="text-brand-mint" /> 소속 그룹 설정
+                <BookOpen size={20} className="text-brand-mint" /> 소속 클래스 설정
              </h4>
              <div className="flex gap-3">
                <select 
@@ -83,7 +83,7 @@ const Settings: React.FC = () => {
                  onChange={(e) => setSelectedGroup(e.target.value)}
                  className="flex-1 px-6 py-4 bg-brand-surface rounded-2xl border-none font-bold text-brand-primary"
                >
-                 <option value="">그룹 선택</option>
+                 <option value="">클래스 선택</option>
                  {groups.map(g => (
                    <option key={g.id} value={g.id}>{g.name}</option>
                  ))}

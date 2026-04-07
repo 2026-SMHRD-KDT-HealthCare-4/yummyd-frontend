@@ -23,7 +23,7 @@ export default function InBoard() {
       const token = localStorage.getItem('token'); // 또는 스토어에서 가져옴
       if (!token) return;
       
-      const url = groupId && groupId !== 'all' ? `/api/admin/stats?group_id=${groupId}` : '/api/admin/stats';
+      const url = groupId && groupId !== 'all' ? `/api/admin/stats?class_id=${groupId}` : '/api/admin/stats';
       const res = await axios.get(url, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -39,8 +39,8 @@ export default function InBoard() {
 
   const fetchGroups = async () => {
     try {
-      const res = await axios.get('/api/groups/my-groups');
-      if (res.data.success) setGroups(res.data.groups);
+      const res = await axios.get('/api/classes/my-classes');
+      if (res.data.success) setGroups(res.data.classes);
     } catch (err) {
       console.error('Failed to fetch groups:', err);
     }
@@ -56,14 +56,14 @@ export default function InBoard() {
   const handleCreateGroup = async () => {
     if (!newGroupName) return;
     try {
-      const res = await axios.post('/api/groups/create', { name: newGroupName });
+      const res = await axios.post('/api/classes/create', { name: newGroupName });
       if (res.data.success) {
-        alert('그룹이 생성되었습니다.');
+        alert('클래스가 생성되었습니다.');
         setNewGroupName('');
         fetchGroups();
       }
     } catch (err) {
-      alert('그룹 생성 실패');
+      alert('클래스 생성 실패');
     }
   };
 
@@ -97,9 +97,9 @@ export default function InBoard() {
                    onChange={handleGroupChange}
                    className="bg-transparent text-brand-mint font-bold outline-none border-none text-xs"
                  >
-                   <option value="all" className="bg-slate-800 text-white">모든 그룹 보기</option>
+                   <option value="all" className="bg-slate-800 text-white">모든 클래스 보기</option>
                    {groups.map(g => (
-                     <option key={g.id} value={g.id} className="bg-slate-800 text-white">{g.name}</option>
+                     <option key={g.id} value={g.id} className="bg-slate-800 text-white">{g.class_name}</option>
                    ))}
                  </select>
               </div>
@@ -115,14 +115,14 @@ export default function InBoard() {
           <input 
             value={newGroupName}
             onChange={(e) => setNewGroupName(e.target.value)}
-            placeholder="새 그룹명" 
+            placeholder="새 클래스명"
             className="flex-1 px-4 py-2 bg-brand-surface rounded-xl font-bold text-sm outline-none"
           />
           <button 
             onClick={handleCreateGroup}
             className="px-4 py-2 bg-brand-primary text-white rounded-xl font-black text-xs whitespace-nowrap"
           >
-            그룹 추가
+            클래스 추가
           </button>
         </div>
       </div>

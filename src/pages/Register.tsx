@@ -17,8 +17,7 @@ const Register: React.FC = () => {
     email: '',
     organization_name: '',
     institution_id: '',
-    group_id: '',
-    cohort_id: '',
+    class_id: '',
     privacy_consent: false,
     third_party_consent: false
   });
@@ -26,7 +25,7 @@ const Register: React.FC = () => {
   // 기관 목록 로드
   React.useEffect(() => {
     if (role === 'student') {
-      axios.get('/api/groups/institutions').then(res => {
+      axios.get('/api/classes/institutions').then(res => {
         if (res.data.success) setInstitutions(res.data.institutions);
       });
     }
@@ -35,8 +34,8 @@ const Register: React.FC = () => {
   // 선택된 기관의 그룹 목록 로드
   React.useEffect(() => {
     if (formData.institution_id) {
-      axios.get(`/api/groups/list?institution_id=${formData.institution_id}`).then(res => {
-        if (res.data.success) setGroups(res.data.groups);
+      axios.get(`/api/classes/list?institution_id=${formData.institution_id}`).then(res => {
+        if (res.data.success) setGroups(res.data.classes);
       });
     }
   }, [formData.institution_id]);
@@ -51,7 +50,7 @@ const Register: React.FC = () => {
     }));
   };
 
-  const isFormValid = isIdChecked && formData.password.length >= 6 && formData.username && formData.email && formData.privacy_consent && (role === 'institution' ? formData.organization_name : (formData.institution_id && formData.group_id));
+  const isFormValid = isIdChecked && formData.password.length >= 6 && formData.username && formData.email && formData.privacy_consent && (role === 'institution' ? formData.organization_name : (formData.institution_id && formData.class_id));
 
   const handleCheckId = async () => {
     if (!formData.login_id) {
@@ -172,19 +171,19 @@ const Register: React.FC = () => {
               </select>
               
               <select 
-                name="group_id" 
+                name="class_id"
                 required 
                 disabled={!formData.institution_id || groups.length === 0}
                 onChange={handleChange} 
                 className="w-full px-6 py-4 bg-brand-surface rounded-2xl border-none outline-none focus:ring-2 ring-brand-primary/20 font-bold text-brand-primary transition-all appearance-none disabled:opacity-50"
               >
-                <option value="">그룹(반) 선택</option>
+                <option value="">반(클래스) 선택</option>
                 {groups.length > 0 ? (
                   groups.map(group => (
-                    <option key={group.id} value={group.id}>{group.name}</option>
+                    <option key={group.id} value={group.id}>{group.class_name}</option>
                   ))
                 ) : (
-                  <option disabled>선택 가능한 그룹이 없습니다.</option>
+                  <option disabled>선택 가능한 클래스가 없습니다.</option>
                 )}
               </select>
               {role === 'student' && institutions.length === 0 && (
