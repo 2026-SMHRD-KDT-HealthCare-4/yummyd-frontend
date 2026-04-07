@@ -245,7 +245,7 @@ export default function Jar() {
                         <Quote size={32} className="text-brand-primary fill-brand-primary/20" />
                      </div>
                      <p className="text-3xl font-black text-brand-primary leading-tight tracking-tight">
-                        "{emotions[0]?.gpt_summary || "아직 첫 기록이 없네요. 오늘의 마음을 들려주시면 야미가 멋진 요약을 해드릴게요!"}"
+                        "{emotions[0]?.EMO_reflectionText || "아직 첫 기록이 없네요. 오늘의 마음을 들려주시면 야미가 멋진 요약을 해드릴게요!"}"
                      </p>
                   </div>
                   <div className="flex items-center gap-4">
@@ -298,8 +298,8 @@ export default function Jar() {
                   <motion.div key={idx} whileHover={{ x: 10 }} className="flex items-center gap-8 p-6 bg-brand-surface/10 rounded-[2.5rem] border border-transparent hover:border-brand-primary/5 transition-all group">
                      <div className={`w-3 h-10 rounded-full ${item.rep_emotion === 'happy' ? 'bg-brand-mint' : 'bg-brand-pink'} shrink-0`} />
                      <div className="flex-1">
-                        <span className="text-[10px] font-black text-brand-primary/40 uppercase">{new Date(item.created_at).toLocaleDateString()}</span>
-                        <p className="text-base font-bold text-brand-primary truncate">{item.origin_text}</p>
+                        <span className="text-[10px] font-black text-brand-primary/40 uppercase">{new Date(item.createdAt).toLocaleDateString()}</span>
+                        <p className="text-base font-bold text-brand-primary truncate">{item.EMO_reflectionText}</p>
                      </div>
                      <ArrowUpRight size={20} className="text-brand-primary/10 group-hover:text-brand-primary" />
                   </motion.div>
@@ -458,14 +458,6 @@ export default function Jar() {
                      /* 데이터가 없을 때의 기본 아이콘 */
                      <Sparkles size={60} className="text-brand-primary/20" />
                   )}
-
-                  {/* 우상단 등급 라벨 */}
-                  <div 
-                     className="absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-black text-white shadow-lg"
-                     style={{ backgroundColor: currentColor }}
-                  >
-                     {result.grade.toUpperCase()}
-                  </div>
                </div>
 
                {/* 하단 텍스트 정보 */}

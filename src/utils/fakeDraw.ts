@@ -12,8 +12,8 @@ type Item = {
 };
 
 const RATE = {
-  common: 0,
-  rare: 0,
+  common: 40,
+  rare: 30,
   unique:20,
   epic: 10
 };

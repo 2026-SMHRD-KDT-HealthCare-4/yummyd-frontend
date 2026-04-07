@@ -13,9 +13,9 @@ const Settings: React.FC = () => {
 
   // 내 기관의 클래스 목록 로드
   React.useEffect(() => {
-    if (user?.role === 'student' && user?.institution_id) {
-      axios.get(`/api/classes/list?institution_id=${user.institution_id}`).then(res => {
-        if (res.data.success) setClasses(res.data.classes);
+    if (user?.role === 'student' && user?.class_id) {
+      axios.get(`/api/classes/list?class_id=${user.class_id}`).then(res => {
+        if (res.data.success) setGroups(res.data.classes);
       });
     }
   }, [user]);
