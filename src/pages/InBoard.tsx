@@ -17,21 +17,32 @@ export default function InBoard() {
   const [groups, setGroups] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('all');
   const [newGroupName, setNewGroupName] = useState('');
+  const [weeklyTrend, setWeeklyTrend] = useState<any[]>([]);
+  const [highRiskStudents, setHighRiskStudents] = useState<any[]>([]);
 
   const fetchStats = async (groupId?: string) => {
     try {
-      const token = localStorage.getItem('token'); // 또는 스토어에서 가져옴
+      const token = localStorage.getItem('token');
       if (!token) return;
       
-      const url = groupId && groupId !== 'all' ? `/api/admin/stats?group_id=${groupId}` : '/api/admin/stats';
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data.success) {
-        setStats(res.data.data);
-      }
+      const config = { headers: { Authorization: `Bearer ${token}` } };
+      const gid = groupId || selectedGroup;
+      const query = gid !== 'all' ? `?group_id=${gid}` : '';
+
+      // 1. 기본 통계
+      const statsRes = await axios.get(`/api/admin/stats${query}`, config);
+      if (statsRes.data.success) setStats(statsRes.data.data);
+
+      // 2. 주간 추이
+      const trendRes = await axios.get(`/api/admin/weekly-trend${query}`, config);
+      if (trendRes.data.success) setWeeklyTrend(trendRes.data.data);
+
+      // 3. 고위험군 리스트
+      const riskRes = await axios.get(`/api/admin/high-risk-students${query}`, config);
+      if (riskRes.data.success) setHighRiskStudents(riskRes.data.data);
+
     } catch (err) {
-      console.error('Failed to fetch admin stats:', err);
+      console.error('Failed to fetch admin data:', err);
     } finally {
       setLoading(false);
     }
@@ -153,42 +164,42 @@ export default function InBoard() {
               </h3>
            </div>
            <div className="h-64 flex items-end justify-between gap-3 px-4">
-             {[40, 65, 30, 85, 45, 70, 55].map((h, i) => (
+             {weeklyTrend.length > 0 ? weeklyTrend.map((t, i) => (
                <div key={i} className="flex-1 flex flex-col items-center gap-3 group">
                   <div className="relative w-full">
                      <motion.div 
                        initial={{ height: 0 }}
-                       animate={{ height: `${h}%` }}
-                       className={`w-full rounded-t-xl transition-all cursor-pointer ${h > 70 ? 'bg-brand-pink' : 'bg-brand-primary/20 group-hover:bg-brand-primary'}`}
+                       animate={{ height: `${(t.avg_risk / 2) * 100}%` }}
+                       className={`w-full rounded-t-xl transition-all cursor-pointer ${t.avg_risk > 1.5 ? 'bg-brand-pink' : 'bg-brand-primary/20 group-hover:bg-brand-primary'}`}
                      />
                   </div>
-                  <span className="text-[10px] font-bold text-slate-400">Day {i+1}</span>
+                  <span className="text-[10px] font-bold text-slate-400">{t.date.split('-').slice(1).join('/')}</span>
                </div>
-             ))}
+             )) : (
+               <div className="w-full text-center text-slate-300 font-bold">충분한 데이터가 없습니다.</div>
+             )}
            </div>
         </div>
 
         <div className="bg-white p-10 rounded-[3rem] border border-brand-surface space-y-8 shadow-xl">
            <h3 className="text-2xl font-black text-slate-800">위험군 정밀 모니터링</h3>
            <div className="space-y-4">
-              {[
-                { name: '김*현', risk: '고위험', score: '0.89', detail: '3일 연속 부정 단어 빈도 급증' },
-                { name: '이*우', risk: '주의', score: '0.65', detail: '제출 지연 시간 120분 초과' },
-                { name: '박*아', risk: '정상', score: '0.12', detail: '학습 열정 지표 상승 중' },
-              ].map((user, i) => (
+              {highRiskStudents.length > 0 ? highRiskStudents.map((s, i) => (
                 <div key={i} className="flex items-center justify-between p-6 bg-slate-50 rounded-2xl hover:bg-slate-100 transition-colors cursor-pointer group">
                    <div className="flex items-center gap-5">
-                      <div className={`w-4 h-4 rounded-full shadow-inner ${user.risk === '고위험' ? 'bg-brand-pink animate-pulse' : user.risk === '주의' ? 'bg-brand-yellow' : 'bg-brand-mint'}`} />
+                      <div className={`w-4 h-4 rounded-full shadow-inner ${s.status === '고위험' ? 'bg-brand-pink animate-pulse' : s.status === '주의' ? 'bg-brand-yellow' : 'bg-brand-mint'}`} />
                       <div>
                          <p className="font-black text-slate-800 flex items-center gap-2">
-                            {user.name} <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-400 font-bold">Prob: {user.score}</span>
+                            {s.name} <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-400 font-bold">Risk: {parseFloat(s.risk_score).toFixed(2)}</span>
                          </p>
-                         <p className="text-xs font-bold text-slate-400 mt-1">{user.detail}</p>
+                         <p className="text-xs font-bold text-slate-400 mt-1">{s.status === '고위험' ? '심리적 번아웃 의심' : '지속적 관찰 필요'}</p>
                       </div>
                    </div>
                    <ChevronRight className="text-slate-300 group-hover:text-slate-800 transition-colors" size={20} />
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-10 text-slate-300 font-bold">현재 위험군 학생이 없습니다.</div>
+              )}
            </div>
            <button className="w-full py-4 bg-slate-800 text-white rounded-2xl font-black text-sm hover:bg-black transition-colors">
               전체 수강생 분석 리포트 다운로드 (.PDF)
