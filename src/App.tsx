@@ -31,8 +31,7 @@ function App() {
   // 🔌 소켓 이벤트 핸들링
   useEffect(() => {
     if (user) {
-      // 룸 접속 시 userId와 cohortId 전달 (강사는 cohortId가 null일 수 있으므로 처리 필요)
-      socket.emit('join', { userId: user.id, cohortId: user.role === 'student' ? user.cohort_id : 1 }); 
+      socket.emit('join', { userId: user.id, classId: user.class_id ?? null });
 
       socket.on('analysis_started', () => {
         setAnalyzing(true);
