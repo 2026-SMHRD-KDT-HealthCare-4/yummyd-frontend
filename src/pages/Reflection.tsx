@@ -95,7 +95,7 @@ export default function Reflection() {
       if (isAnalyzing && user) {
         await fetchHistory();
         const last = emotions[0];
-        if (last && last.analysis_status === 'completed') {
+        if (last && last.createdAt) {
           const finishedAt = new Date(last.updatedAt).getTime();
           if (Date.now() - finishedAt < 60000) setAnalyzing(false);
         }
