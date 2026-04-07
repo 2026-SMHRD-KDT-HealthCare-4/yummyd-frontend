@@ -193,7 +193,8 @@ export default function Reflection() {
   // 공통 상태
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [analysisStep, setAnalysisStep] = useState(0);
+  const [charToggle, setCharToggle] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const emotionFileRef = useRef<HTMLInputElement>(null);
   const studyFileRef = useRef<HTMLInputElement>(null);
@@ -224,23 +225,17 @@ export default function Reflection() {
     }
   }, [isAnalyzing, user, fetchHistory, emotions, setAnalyzing]);
 
-  const analysisSteps = [
-    '야미가 당신의 이야기를 읽고 있어요...',
-    '문장 속에서 감정 조각들을 찾는 중...',
-    '오늘의 마음 사탕을 예쁘게 빚고 있어요!',
-    '거의 다 됐어요! 유리병에 담는 중...',
-  ];
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isAnalyzing) {
-      setAnalysisStep(0);
-      interval = setInterval(() => {
-        setAnalysisStep(prev => (prev < 3 ? prev + 1 : prev));
-      }, 1200);
+    let charInterval: ReturnType<typeof setInterval>;
+    if (isTransitioning) {
+      setCharToggle(true);
+      charInterval = setInterval(() => {
+        setCharToggle(prev => !prev);
+      }, 700);
     }
-    return () => clearInterval(interval);
-  }, [isAnalyzing]);
+    return () => clearInterval(charInterval);
+  }, [isTransitioning]);
 
   // ─── 이미지 처리 ───────────────────────────────────────
   const processImage = (file: File): Promise<string> => {
@@ -296,7 +291,7 @@ export default function Reflection() {
   };
 
   // ─── 제출 ──────────────────────────────────────────────
-  const canSubmit = !isAnalyzing && (
+  const canSubmit = !isTransitioning && (
     !!selectedEmotion || !!emotionOneLine.trim() || !!todayGoal.trim() || !!learned.trim()
   );
 
@@ -328,13 +323,17 @@ export default function Reflection() {
       });
 
       if (response.data.success) {
+        setIsTransitioning(true);
         setAnalyzing(true);
-        setTimeout(() => { navigate('/jar'); }, 1500);
+        setTimeout(() => {
+          setIsTransitioning(false);
+          navigate('/jar');
+        }, 2000);
       }
     } catch (error) {
       console.error('Submission failed:', error);
       alert('회고 등록 중 오류가 발생했습니다. 서버 연결을 확인해주세요.');
-      setAnalyzing(false);
+      setIsTransitioning(false);
     }
   };
 
@@ -356,50 +355,40 @@ export default function Reflection() {
         </div>
       )}
 
-      {/* 분석 중 오버레이 */}
-      <AnimatePresence>
-        {isAnalyzing && (
+      {/* 전환 오버레이 — 제출 후 2초간 표시 */}
+      {isTransitioning && (
+        <div className="fixed inset-0 z-[200] bg-[#FFF9F0] flex flex-col items-center justify-center">
           <motion.div
-            key="analysis-overlay"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-white/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6"
+            animate={{ y: [0, -22, 0] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+            className="mb-10 relative w-56 h-56"
           >
-            <motion.div
-              animate={{ y: [0, -20, 0] }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="mb-12"
-            >
-              <img
-                src={analysisStep < 2 ? yummyPure : yummyWink}
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={charToggle ? 'pure' : 'wink'}
+                src={charToggle ? yummyPure : yummyWink}
                 alt="Yummy"
-                className="w-64 h-64 object-contain"
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.85 }}
+                transition={{ duration: 0.2 }}
+                className="w-56 h-56 object-contain absolute inset-0"
               />
-            </motion.div>
-            <div className="text-center space-y-6 max-w-md">
-              <motion.h3
-                key={analysisStep}
-                initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-                className="text-2xl font-black text-brand-primary"
-              >
-                {analysisSteps[analysisStep]}
-              </motion.h3>
-              <div className="w-full h-2 bg-brand-surface rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(analysisStep + 1) * 25}%` }}
-                  className="h-full bg-brand-primary"
-                />
-              </div>
-            </div>
+            </AnimatePresence>
           </motion.div>
-        )}
-      </AnimatePresence>
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-xl font-black text-brand-primary"
+          >
+            오늘의 마음을 담고 있어요 🍬
+          </motion.p>
+        </div>
+      )}
 
       {/* 본문 */}
-      <motion.div
-        animate={{ filter: isAnalyzing ? 'blur(10px)' : 'blur(0px)', opacity: isAnalyzing ? 0.3 : 1 }}
-        className="max-w-[600px] mx-auto px-4 py-6 pb-28 flex flex-col gap-5"
-      >
+      <div className="max-w-[600px] mx-auto px-4 py-6 pb-28 flex flex-col gap-5">
 
         {/* ── 감정 리플렉션 카드 ── */}
         <div>
@@ -667,7 +656,7 @@ export default function Reflection() {
           </div>
         </div>
 
-      </motion.div>
+      </div>
 
       {/* ── 하단 fixed 버튼 ── */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#FFF9F0]/95 backdrop-blur border-t border-[#F0E6D3] px-4 py-3.5 z-[200]">
