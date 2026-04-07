@@ -11,11 +11,11 @@ const Settings: React.FC = () => {
   const [groups, setGroups] = React.useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = React.useState<string>(user?.group_id?.toString() || '');
 
-  // 내 기관의 그룹 목록 로드
+  // 내 기관의 클래스 목록 로드
   React.useEffect(() => {
-    if (user?.role === 'student' && user?.institution_id) {
-      axios.get(`/api/groups/list?institution_id=${user.institution_id}`).then(res => {
-        if (res.data.success) setGroups(res.data.groups);
+    if (user?.role === 'student' && user?.class_id) {
+      axios.get(`/api/classes/list?class_id=${user.class_id}`).then(res => {
+        if (res.data.success) setGroups(res.data.classes);
       });
     }
   }, [user]);
