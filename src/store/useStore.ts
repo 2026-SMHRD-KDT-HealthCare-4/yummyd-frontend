@@ -4,14 +4,15 @@ import axios from 'axios';
 interface User {
   id: number;
   username: string;
-  role: 'student' | 'institution' | 'instructor';
+  role: 'student' | 'admin' | 'instructor';
   login_id?: string;
-  organization_name?: string;
+  institution_id?: number;
+  class_id?: number;
   current_candy_count?: number;
   total_candy_count?: number;
   attendance_days?: number;
   streak?: number;
-  class_id?: number;
+  last_login_at?: string;
 }
 
 interface CandyPost {

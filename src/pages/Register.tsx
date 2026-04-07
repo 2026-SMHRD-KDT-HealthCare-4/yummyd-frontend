@@ -9,7 +9,7 @@ const Register: React.FC = () => {
   const [role, setRole] = useState<'student' | 'institution'>('student');
   const [isIdChecked, setIsIdChecked] = useState(false);
   const [institutions, setInstitutions] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     login_id: '',
     password: '',
@@ -18,6 +18,7 @@ const Register: React.FC = () => {
     organization_name: '',
     institution_id: '',
     class_id: '',
+    cohort_id: '',
     privacy_consent: false,
     third_party_consent: false
   });
@@ -31,11 +32,11 @@ const Register: React.FC = () => {
     }
   }, [role]);
 
-  // 선택된 기관의 그룹 목록 로드
+  // 선택된 기관의 클래스 목록 로드
   React.useEffect(() => {
     if (formData.institution_id) {
       axios.get(`/api/classes/list?institution_id=${formData.institution_id}`).then(res => {
-        if (res.data.success) setGroups(res.data.classes);
+        if (res.data.success) setClasses(res.data.classes);
       });
     }
   }, [formData.institution_id]);
@@ -163,7 +164,7 @@ const Register: React.FC = () => {
                 <option value="">기관 선택</option>
                 {institutions.length > 0 ? (
                   institutions.map(inst => (
-                    <option key={inst.id} value={inst.id}>{inst.organization_name}</option>
+                    <option key={inst.id} value={inst.id}>{inst.inst_name}</option>
                   ))
                 ) : (
                   <option disabled>등록된 기관이 없습니다.</option>
@@ -171,16 +172,16 @@ const Register: React.FC = () => {
               </select>
               
               <select 
-                name="class_id"
+                name="class_id" 
                 required 
-                disabled={!formData.institution_id || groups.length === 0}
+                disabled={!formData.institution_id || classes.length === 0}
                 onChange={handleChange} 
                 className="w-full px-6 py-4 bg-brand-surface rounded-2xl border-none outline-none focus:ring-2 ring-brand-primary/20 font-bold text-brand-primary transition-all appearance-none disabled:opacity-50"
               >
-                <option value="">반(클래스) 선택</option>
-                {groups.length > 0 ? (
-                  groups.map(group => (
-                    <option key={group.id} value={group.id}>{group.class_name}</option>
+                <option value="">그룹(반) 선택</option>
+                {classes.length > 0 ? (
+                  classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.class_name || cls.name}</option>
                   ))
                 ) : (
                   <option disabled>선택 가능한 클래스가 없습니다.</option>
