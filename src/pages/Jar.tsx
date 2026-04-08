@@ -96,13 +96,15 @@ export default function Jar() {
   });
 
   // 결과 등장
-  setTimeout(() => {
+  setTimeout(async() => {
   setResult(res.item);          // 여기서 결과 넣기
   setDrawGrade(res.item.grade);
   setLastDrawnItem(res.item);
-  setTimeout(() => setLastDrawnItem(null), 3000);
-
   setPhase("reveal");
+
+   await fetchCollection();
+
+  setTimeout(() => setLastDrawnItem(null), 3000);
 }, revealTime);
 
   // 종료: 초기화
