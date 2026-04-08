@@ -61,12 +61,6 @@ export default function Jar() {
     return;
   }
 
-  // 결과 세팅: phase 변경 전에 먼저
-  setResult(res.item);
-  setDrawGrade(res.item!.grade);
-  setLastDrawnItem(res.item);
-  setTimeout(() => setLastDrawnItem(null), 3000);
-
   // 단계별 시간 변수화
   const gradeSequence: Record<Grade, string[]> = {
     common: ["common"],
@@ -102,7 +96,14 @@ export default function Jar() {
   });
 
   // 결과 등장
-  setTimeout(() => setPhase("reveal"), revealTime);
+  setTimeout(() => {
+  setResult(res.item);          // 여기서 결과 넣기
+  setDrawGrade(res.item.grade);
+  setLastDrawnItem(res.item);
+  setTimeout(() => setLastDrawnItem(null), 3000);
+
+  setPhase("reveal");
+}, revealTime);
 
   // 종료: 초기화
   setTimeout(() => {
