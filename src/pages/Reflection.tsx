@@ -28,21 +28,138 @@ const EMOTIONS: { key: EmotionKey; emoji: string; label: string; spellType: Spel
   { key: 'angry',  emoji: '😤', label: '짜증나요',  spellType: 'anger'    },
 ];
 
-const ALL_SPELLS: Spell[] = [
-  { icon: '⭐', main: '"나는 오늘도 잘하고 있다"',  placeholder: '오늘 뿌듯했던 순간을 한 줄로 기록해봐요' },
-  { icon: '🌊', main: '"이것도 지나간다"',          placeholder: '오늘 가장 힘들었던 순간을 한 줄로 써볼까요?' },
-  { icon: '🚀', main: '"오늘은 특별한 날이다"',     placeholder: '오늘을 특별하게 만든 게 뭔지 알려줘요!' },
-  { icon: '🛋️', main: '"쉬어도 괜찮다"',           placeholder: '오늘 무리했던 것 같아요. 어떤 점이 힘들었나요?' },
-  { icon: '🌱', main: '"작은 것도 성장이다"',       placeholder: '오늘 스스로를 너무 몰아붙인 순간이 있었나요?' },
-];
+const SPELL_ICONS = ['⭐', '🌟', '✨', '🌈', '🍀', '🌊', '🕊️', '🌙', '💫', '🌿'];
 
-const SPELL_MAP: Record<SpellType, Spell[]> = {
-  positive: [ALL_SPELLS[0], ALL_SPELLS[2], ALL_SPELLS[4]],
-  neutral:  [ALL_SPELLS[4], ALL_SPELLS[0]],
-  negative: [ALL_SPELLS[1], ALL_SPELLS[3]],
-  burnout:  [ALL_SPELLS[3], ALL_SPELLS[1]],
-  anger:    [ALL_SPELLS[1], ALL_SPELLS[4]],
+const SPELL_DATA: Record<SpellType, string[]> = {
+  positive: [
+    '나는 지금 이 순간을 온전히 누릴 자격이 있다',
+    '이 기분은 내가 살아있다는 증거야',
+    '좋은 일은 계속해서 내게로 흘러온다',
+    '잘 되는 건 당연한 일이야, 나니까',
+    '나는 지금 충분히 빛나고 있다',
+    '오늘의 나는 어제보다 한 뼘 더 자랐다',
+    '나는 사랑받고 있고, 사랑을 줄 수 있다',
+    '이 에너지가 오래도록 나와 함께하기를',
+    '나는 내가 원하는 삶의 방향으로 가고 있다',
+    '오늘의 이 감정을 기억하자, 반드시 다시 돌아올 거야',
+  ],
+  neutral: [
+    '굳이 특별한 감정을 만들지 않아도 돼',
+    '그냥 존재하는 것만으로도 오늘은 합격이야',
+    '설레지 않아도 내 하루는 충분히 유효하다',
+    '조용한 날들이 쌓여서 단단한 내가 만들어진다',
+    '지금 이 평온함, 나쁘지 않아',
+    '드라마틱하지 않아도 나는 잘 살아가고 있다',
+    '오늘은 아무 색도 아닌 날, 그래도 나쁘지 않아',
+    '아무것도 느끼지 못하는 것도 하나의 감정이야',
+    '지금 이 무감각은 쉬어가는 중인 거야',
+    '작은 것 하나에만 집중해보자, 지금 이 온도, 이 숨소리',
+  ],
+  negative: [
+    '지금 힘든 게 맞아, 괜찮지 않아도 돼',
+    '이 슬픔은 내가 무언가를 소중히 여긴다는 뜻이야',
+    '울어도 괜찮아, 눈물은 막힌 것을 흘려보내는 거야',
+    '이 감정도 지나간다, 모든 건 흐른다',
+    '나는 이 슬픔에 삼켜지지 않는다',
+    '슬픔을 느낀다는 건 내가 아직 살아있다는 거야',
+    '지금 당장 해결하지 않아도 된다',
+    '이 어둠 속에서도 나는 나를 잃지 않는다',
+    '나는 나를 포기하지 않는다',
+    '나에게 다정하게 대해줄 사람은 먼저 나 자신이야',
+  ],
+  burnout: [
+    '숨 한 번 쉬자, 그것만으로 충분해',
+    '나는 지금까지 정말 많이 버텨왔다',
+    '쉬는 것도 하나의 일이야, 죄책감 갖지 않아도 돼',
+    '오늘은 여기까지만, 그것으로 충분히 잘 했어',
+    '지친 나를 몰아붙이지 않겠다',
+    '내 몸과 마음이 쉬고 싶다고 말하는 거야, 들어줄게',
+    '모든 걸 다 잘할 필요는 없어',
+    '잠깐 멈추는 건 포기가 아니야',
+    '나는 소진되면서까지 증명할 것이 없다',
+    '지금 이 피로는, 내가 열심히 살아온 증거야',
+  ],
+  anger: [
+    '짜증나는 게 맞아, 그럴 만 하니까',
+    '이 감정은 신호야, 내가 뭔가를 원하고 있다는 뜻이야',
+    '지금 이 불쾌함은 내가 예민한 게 아니라 당연한 반응이야',
+    '나는 이 감정에 끌려다니지 않겠다',
+    '심호흡 한 번, 지금 이 순간만 넘기면 돼',
+    '모든 걸 참을 필요는 없지만, 내가 다치지 않는 방식으로 풀자',
+    '짜증은 에너지야, 잘 쓰면 나를 움직이는 힘이 돼',
+    '지금 나를 힘들게 하는 것에 끌려다니지 않겠다',
+    '이 감정도 잠시 후엔 옅어진다',
+    '나는 나의 짜증을 판단하지 않겠다, 그냥 느끼고 보내줄게',
+  ],
 };
+
+const SPELL_PLACEHOLDER_MAP: Record<string, string> = {
+  // 좋아요
+  '나는 지금 이 순간을 온전히 누릴 자격이 있다':       '지금 이 순간, 어떤 기분이 느껴지나요? 그대로 적어봐요',
+  '이 기분은 내가 살아있다는 증거야':                   '오늘 살아있음을 느끼게 해준 것이 있나요?',
+  '좋은 일은 계속해서 내게로 흘러온다':                 '오늘 나에게 흘러온 작은 좋은 일을 적어볼까요?',
+  '잘 되는 건 당연한 일이야, 나니까':                   '오늘 나답게 잘 해낸 것, 하나만 써봐요',
+  '나는 지금 충분히 빛나고 있다':                       '지금 내가 빛난다고 느끼는 이유가 있나요?',
+  '오늘의 나는 어제보다 한 뼘 더 자랐다':               '어제와 달라진 오늘의 내가 느껴지나요?',
+  '나는 사랑받고 있고, 사랑을 줄 수 있다':              '오늘 사랑을 느낀 순간이 있었나요?',
+  '이 에너지가 오래도록 나와 함께하기를':               '지금 이 에너지로 하고 싶은 게 있나요?',
+  '나는 내가 원하는 삶의 방향으로 가고 있다':           '지금 나는 어디로 향하고 있는 것 같나요?',
+  '오늘의 이 감정을 기억하자, 반드시 다시 돌아올 거야': '지금 이 감정을 미래의 나에게 한 마디로 남겨봐요',
+  // 보통이에요
+  '굳이 특별한 감정을 만들지 않아도 돼':                '특별하지 않은 오늘, 그냥 있는 그대로 적어봐요',
+  '그냥 존재하는 것만으로도 오늘은 합격이야':           '오늘 존재하면서 한 것 중 하나만 적어볼까요?',
+  '설레지 않아도 내 하루는 충분히 유효하다':            '설레진 않았지만, 오늘 있었던 일을 담담하게 적어봐요',
+  '조용한 날들이 쌓여서 단단한 내가 만들어진다':        '요즘 조용히 쌓이고 있는 것이 있나요?',
+  '지금 이 평온함, 나쁘지 않아':                        '지금 이 고요함 속에서 뭐가 느껴지나요?',
+  '드라마틱하지 않아도 나는 잘 살아가고 있다':          '별일 없는 오늘, 그래도 내가 해낸 것은요?',
+  '오늘은 아무 색도 아닌 날, 그래도 나쁘지 않아':      '오늘을 색으로 표현한다면 어떤 색일 것 같아요?',
+  '아무것도 느끼지 못하는 것도 하나의 감정이야':        '지금 아무것도 느껴지지 않는다면, 그것도 써봐도 돼요',
+  '지금 이 무감각은 쉬어가는 중인 거야':                '요즘 나의 마음이 쉬고 싶어하는 것 같나요?',
+  '작은 것 하나에만 집중해보자, 지금 이 온도, 이 숨소리': '지금 이 순간 느껴지는 감각을 하나만 적어볼까요?',
+  // 슬퍼요
+  '지금 힘든 게 맞아, 괜찮지 않아도 돼':               '지금 힘든 것, 여기에 그냥 털어놓아도 괜찮아요',
+  '이 슬픔은 내가 무언가를 소중히 여긴다는 뜻이야':    '지금 나에게 소중한 게 뭔지 느껴지나요?',
+  '울어도 괜찮아, 눈물은 막힌 것을 흘려보내는 거야':   '지금 흘려보내고 싶은 것이 있나요?',
+  '이 감정도 지나간다, 모든 건 흐른다':                 '지금 이 감정이 어디서 왔는지, 가만히 느껴봐요',
+  '나는 이 슬픔에 삼켜지지 않는다':                     '지금 나를 붙잡고 있는 것이 무엇인가요?',
+  '슬픔을 느낀다는 건 내가 아직 살아있다는 거야':       '지금 내 안에서 살아있는 감정을 적어봐요',
+  '지금 당장 해결하지 않아도 된다':                     '지금 당장 해결하지 않아도 되는 것, 내려놓아봐요',
+  '이 어둠 속에서도 나는 나를 잃지 않는다':             '지금 어둠 속에서도 내가 붙잡고 있는 것은요?',
+  '나는 나를 포기하지 않는다':                          '지금 나 자신에게 해주고 싶은 말이 있나요?',
+  '나에게 다정하게 대해줄 사람은 먼저 나 자신이야':     '지금 나에게 가장 필요한 다정한 말 한마디는요?',
+  // 지쳐요
+  '숨 한 번 쉬자, 그것만으로 충분해':                   '숨을 고르고 나서, 지금 떠오르는 것을 적어봐요',
+  '나는 지금까지 정말 많이 버텨왔다':                   '내가 버텨온 것들 중 하나만 꺼내봐요, 잘 해왔어요',
+  '쉬는 것도 하나의 일이야, 죄책감 갖지 않아도 돼':    '요즘 쉬지 못하게 만드는 것이 있나요?',
+  '오늘은 여기까지만, 그것으로 충분히 잘 했어':         '오늘 내가 해낸 것 중 딱 하나만, 스스로 인정해줘요',
+  '지친 나를 몰아붙이지 않겠다':                        '요즘 나를 가장 지치게 만드는 게 뭔가요?',
+  '내 몸과 마음이 쉬고 싶다고 말하는 거야, 들어줄게':  '지금 몸과 마음이 원하는 게 뭔지 느껴지나요?',
+  '모든 걸 다 잘할 필요는 없어':                        '요즘 내가 너무 많이 짊어지고 있는 것이 있나요?',
+  '잠깐 멈추는 건 포기가 아니야':                       '지금 잠깐 멈추고 싶은 이유를 적어봐요',
+  '나는 소진되면서까지 증명할 것이 없다':               '요즘 내가 누구에게, 무엇을 증명하려 했던 것 같나요?',
+  '지금 이 피로는, 내가 열심히 살아온 증거야':          '오늘 이 피로를 만들어낸 나의 하루는 어땠나요?',
+  // 짜증나요
+  '짜증나는 게 맞아, 그럴 만 하니까':                   '지금 뭐가 가장 짜증나나요? 여기선 솔직해도 돼요',
+  '이 감정은 신호야, 내가 뭔가를 원하고 있다는 뜻이야': '지금 내가 진짜 원하는 게 뭔지 느껴지나요?',
+  '지금 이 불쾌함은 내가 예민한 게 아니라 당연한 반응이야': '어떤 상황이 나를 불쾌하게 만들었나요?',
+  '나는 이 감정에 끌려다니지 않겠다':                   '지금 이 감정을 어떻게 다루고 싶은가요?',
+  '심호흡 한 번, 지금 이 순간만 넘기면 돼':             '숨 고르고 나서, 지금 딱 한 가지만 적어봐요',
+  '모든 걸 참을 필요는 없지만, 내가 다치지 않는 방식으로 풀자': '나를 다치지 않게 이 감정을 풀 방법이 있을까요?',
+  '짜증은 에너지야, 잘 쓰면 나를 움직이는 힘이 돼':    '이 에너지를 어디에 쓰고 싶은가요?',
+  '지금 나를 힘들게 하는 것에 끌려다니지 않겠다':       '지금 나를 가장 힘들게 하는 것이 뭔지 써봐요',
+  '이 감정도 잠시 후엔 옅어진다':                       '이 감정이 지나가고 나면 어떻게 되고 싶나요?',
+  '나는 나의 짜증을 판단하지 않겠다, 그냥 느끼고 보내줄게': '지금 이 짜증을 그냥 여기에 내려놓아봐요',
+};
+
+const pickRandom = <T,>(arr: T[], count: number): T[] =>
+  [...arr].sort(() => Math.random() - 0.5).slice(0, Math.min(count, arr.length));
+
+const toSpells = (texts: string[], _spellType: SpellType | 'mixed' = 'mixed'): Spell[] =>
+  texts.map((text, i) => ({
+    icon: SPELL_ICONS[i % SPELL_ICONS.length],
+    main: `"${text}"`,
+    placeholder: SPELL_PLACEHOLDER_MAP[text] ?? '오늘 하루 어떤 감정이 가장 컸나요? 편하게 털어놔봐요 :)',
+  }));
 
 const ACHIEVEMENTS: { key: AchievementKey; emoji: string; main: string; sub: string; color: string }[] = [
   { key: 'clear', emoji: '🎉', main: '완전히 이해했다!',     sub: '오늘 목표 완벽 달성',      color: 'border-emerald-400 bg-emerald-50' },
@@ -59,6 +176,8 @@ export default function Reflection() {
   const [selectedEmotion, setSelectedEmotion] = useState<EmotionKey | null>(null);
   const [selectedSpell, setSelectedSpell] = useState<Spell | null>(null);
   const [showAllSpells, setShowAllSpells] = useState(false);
+  const [displayedSpells, setDisplayedSpells] = useState<Spell[]>([]);
+  const [extraSpells, setExtraSpells] = useState<Spell[]>([]);
   const [emotionOneLine, setEmotionOneLine] = useState('');
   const [emotionImage, setEmotionImage] = useState<string | null>(null);
 
@@ -74,20 +193,18 @@ export default function Reflection() {
   // 공통 상태
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [analysisStep, setAnalysisStep] = useState(0);
+  const [charToggle, setCharToggle] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const emotionFileRef = useRef<HTMLInputElement>(null);
   const studyFileRef = useRef<HTMLInputElement>(null);
+  const freeTextStartRef = useRef<number | null>(null);
 
   const { user, setAnalyzing, isAnalyzing, fetchHistory, emotions } = useStore();
 
   // 어제 복습 힌트
-  const yesterdayReview = emotions[0]?.review ?? null;
+  const yesterdayReview = emotions[0]?.EDU_review ?? null;
 
-  // 현재 표시할 주문 목록
-  const currentSpells: Spell[] = selectedEmotion
-    ? (showAllSpells ? ALL_SPELLS : SPELL_MAP[EMOTIONS.find(e => e.key === selectedEmotion)!.spellType])
-    : [];
 
   // ─── 분석 상태 감시 ────────────────────────────────────
   useEffect(() => {
@@ -108,23 +225,17 @@ export default function Reflection() {
     }
   }, [isAnalyzing, user, fetchHistory, emotions, setAnalyzing]);
 
-  const analysisSteps = [
-    '야미가 당신의 이야기를 읽고 있어요...',
-    '문장 속에서 감정 조각들을 찾는 중...',
-    '오늘의 마음 사탕을 예쁘게 빚고 있어요!',
-    '거의 다 됐어요! 유리병에 담는 중...',
-  ];
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
-    if (isAnalyzing) {
-      setAnalysisStep(0);
-      interval = setInterval(() => {
-        setAnalysisStep(prev => (prev < 3 ? prev + 1 : prev));
-      }, 1200);
+    let charInterval: ReturnType<typeof setInterval>;
+    if (isTransitioning) {
+      setCharToggle(true);
+      charInterval = setInterval(() => {
+        setCharToggle(prev => !prev);
+      }, 700);
     }
-    return () => clearInterval(interval);
-  }, [isAnalyzing]);
+    return () => clearInterval(charInterval);
+  }, [isTransitioning]);
 
   // ─── 이미지 처리 ───────────────────────────────────────
   const processImage = (file: File): Promise<string> => {
@@ -180,7 +291,7 @@ export default function Reflection() {
   };
 
   // ─── 제출 ──────────────────────────────────────────────
-  const canSubmit = !isAnalyzing && (
+  const canSubmit = !isTransitioning && (
     !!selectedEmotion || !!emotionOneLine.trim() || !!todayGoal.trim() || !!learned.trim()
   );
 
@@ -188,9 +299,14 @@ export default function Reflection() {
     if (!canSubmit) return;
     if (!user) return alert('로그인이 필요합니다.');
 
+    const delayMinutes = freeTextStartRef.current
+      ? Math.round((Date.now() - freeTextStartRef.current) / 1000)
+      : 0;
+
     try {
       const response = await axios.post('/api/reflection', {
         userId: user.id,
+        delayMinutes,
         text: emotionOneLine,
         image: emotionImage,
         isPrivate: false,
@@ -207,13 +323,17 @@ export default function Reflection() {
       });
 
       if (response.data.success) {
+        setIsTransitioning(true);
         setAnalyzing(true);
-        setTimeout(() => { navigate('/jar'); }, 1500);
+        setTimeout(() => {
+          setIsTransitioning(false);
+          navigate('/jar');
+        }, 2000);
       }
     } catch (error) {
       console.error('Submission failed:', error);
       alert('회고 등록 중 오류가 발생했습니다. 서버 연결을 확인해주세요.');
-      setAnalyzing(false);
+      setIsTransitioning(false);
     }
   };
 
@@ -235,50 +355,40 @@ export default function Reflection() {
         </div>
       )}
 
-      {/* 분석 중 오버레이 */}
-      <AnimatePresence>
-        {isAnalyzing && (
+      {/* 전환 오버레이 — 제출 후 2초간 표시 */}
+      {isTransitioning && (
+        <div className="fixed inset-0 z-[200] bg-[#FFF9F0] flex flex-col items-center justify-center">
           <motion.div
-            key="analysis-overlay"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-white/95 backdrop-blur-2xl flex flex-col items-center justify-center p-6"
+            animate={{ y: [0, -22, 0] }}
+            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+            className="mb-10 relative w-56 h-56"
           >
-            <motion.div
-              animate={{ y: [0, -20, 0] }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="mb-12"
-            >
-              <img
-                src={analysisStep < 2 ? yummyPure : yummyWink}
+            <AnimatePresence mode="wait">
+              <motion.img
+                key={charToggle ? 'pure' : 'wink'}
+                src={charToggle ? yummyPure : yummyWink}
                 alt="Yummy"
-                className="w-64 h-64 object-contain"
+                initial={{ opacity: 0, scale: 0.85 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.85 }}
+                transition={{ duration: 0.2 }}
+                className="w-56 h-56 object-contain absolute inset-0"
               />
-            </motion.div>
-            <div className="text-center space-y-6 max-w-md">
-              <motion.h3
-                key={analysisStep}
-                initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-                className="text-2xl font-black text-brand-primary"
-              >
-                {analysisSteps[analysisStep]}
-              </motion.h3>
-              <div className="w-full h-2 bg-brand-surface rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(analysisStep + 1) * 25}%` }}
-                  className="h-full bg-brand-primary"
-                />
-              </div>
-            </div>
+            </AnimatePresence>
           </motion.div>
-        )}
-      </AnimatePresence>
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-xl font-black text-brand-primary"
+          >
+            오늘의 마음을 담고 있어요 🍬
+          </motion.p>
+        </div>
+      )}
 
       {/* 본문 */}
-      <motion.div
-        animate={{ filter: isAnalyzing ? 'blur(10px)' : 'blur(0px)', opacity: isAnalyzing ? 0.3 : 1 }}
-        className="max-w-[600px] mx-auto px-4 py-6 pb-28 flex flex-col gap-5"
-      >
+      <div className="max-w-[600px] mx-auto px-4 py-6 pb-28 flex flex-col gap-5">
 
         {/* ── 감정 리플렉션 카드 ── */}
         <div>
@@ -297,6 +407,8 @@ export default function Reflection() {
                     setSelectedEmotion(em.key);
                     setSelectedSpell(null);
                     setShowAllSpells(false);
+                    setExtraSpells([]);
+                    setDisplayedSpells(toSpells(pickRandom(SPELL_DATA[em.spellType], 3), em.spellType));
                   }}
                   className={`
                     flex-1 flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-all
@@ -326,7 +438,7 @@ export default function Reflection() {
                     ✨ 오늘 나에게 필요한 주문은?
                   </p>
                   <div className="flex flex-col gap-2">
-                    {currentSpells.map((spell) => (
+                    {[...displayedSpells, ...extraSpells].map((spell) => (
                       <button
                         key={spell.main}
                         onClick={() => setSelectedSpell(spell)}
@@ -345,7 +457,19 @@ export default function Reflection() {
                     ))}
                   </div>
                   <button
-                    onClick={() => setShowAllSpells(prev => !prev)}
+                    onClick={() => {
+                      if (showAllSpells) {
+                        setShowAllSpells(false);
+                        setExtraSpells([]);
+                      } else {
+                        const currentType = EMOTIONS.find(e => e.key === selectedEmotion)!.spellType;
+                        const otherTexts = Object.entries(SPELL_DATA)
+                          .filter(([type]) => type !== currentType)
+                          .flatMap(([, texts]) => texts);
+                        setExtraSpells(toSpells(pickRandom(otherTexts, Math.floor(Math.random() * 2) + 2), 'mixed'));
+                        setShowAllSpells(true);
+                      }
+                    }}
                     className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors py-2"
                   >
                     {showAllSpells ? '· 접기' : '· 다른 주문 보기'}
@@ -496,7 +620,10 @@ export default function Reflection() {
                   className="w-full border border-[#F0E6D3] rounded-xl px-3.5 py-3 text-sm text-gray-800 bg-white/90 resize-none outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/10 placeholder:text-gray-400 placeholder:text-[13px] leading-relaxed transition"
                   placeholder="오늘 수업에서 더 기록해두고 싶은 내용이 있으면 자유롭게 적어봐요"
                   value={freeText}
-                  onChange={e => setFreeText(e.target.value)}
+                  onChange={e => {
+                    if (!freeTextStartRef.current) freeTextStartRef.current = Date.now();
+                    setFreeText(e.target.value);
+                  }}
                 />
                 <span className="absolute bottom-2.5 right-3 text-[11px] text-gray-300">{freeText.length}/2000</span>
               </div>
@@ -529,7 +656,7 @@ export default function Reflection() {
           </div>
         </div>
 
-      </motion.div>
+      </div>
 
       {/* ── 하단 fixed 버튼 ── */}
       <div className="fixed bottom-0 left-0 right-0 bg-[#FFF9F0]/95 backdrop-blur border-t border-[#F0E6D3] px-4 py-3.5 z-[200]">

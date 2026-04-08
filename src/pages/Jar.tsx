@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Trophy, Star, ArrowUpRight, Sparkles, Quote, History, BrainCircuit, Activity, Package, Gamepad2 } from 'lucide-react';
+import { Star, ArrowUpRight, Sparkles, Quote, History, BrainCircuit, Activity, Package, Gamepad2 } from 'lucide-react';
 
 /* 아바타 개발을 위한 임시 작업 DB 작업후 수정 필요 */
 // import { MOCK_ITEMS } from '../data/Avatar';
@@ -138,17 +138,15 @@ export default function Jar() {
                    <Star size={16} className="text-brand-yellow fill-brand-yellow" /> Candy Status
                 </h3>
              </div>
-             <div className="grid grid-cols-2 gap-4">
-                {[
-                  { icon: <Gamepad2 size={20} />, label: "현재 캔디", val: `${user?.current_candy_count || 0}개`, color: "text-brand-mint", bg: "bg-brand-mint/20" },
-                  { icon: <Trophy size={20} />, label: "누적 캔디", val: `${user?.total_candy_count || 0}개`, color: "text-brand-orange", bg: "bg-brand-yellow/20" }
-                ].map((item, i) => (
-                  <div key={i} className="p-4 bg-white/60 rounded-3xl border border-white/40 shadow-sm transition-transform hover:scale-[1.05]">
-                     <div className={`w-10 h-10 ${item.bg} rounded-xl flex items-center justify-center ${item.color} mb-3`}>{item.icon}</div>
-                     <p className="text-[10px] font-black text-brand-primary/50 uppercase tracking-widest">{item.label}</p>
-                     <p className="text-xl font-black text-brand-primary">{item.val}</p>
-                  </div>
-                ))}
+             <div className="p-5 bg-white/60 rounded-3xl border border-white/40 shadow-sm flex items-center gap-5">
+                <div className="w-12 h-12 bg-brand-mint/20 rounded-xl flex items-center justify-center text-brand-mint shrink-0">
+                  <Gamepad2 size={24} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-brand-primary/50 uppercase tracking-widest">현재 캔디</p>
+                  <p className="text-3xl font-black text-brand-primary">{user?.current_candy_count || 0}개</p>
+                  <p className="text-[10px] text-brand-primary/40 mt-0.5">하루 최대 2개 적립</p>
+                </div>
              </div>
           </div>
 

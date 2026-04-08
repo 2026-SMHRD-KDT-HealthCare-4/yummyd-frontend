@@ -184,7 +184,7 @@ const Register: React.FC = () => {
                     <option key={cls.id} value={cls.id}>{cls.class_name || cls.name}</option>
                   ))
                 ) : (
-                  <option disabled>선택 가능한 그룹이 없습니다.</option>
+                  <option disabled>선택 가능한 클래스가 없습니다.</option>
                 )}
               </select>
               {role === 'student' && institutions.length === 0 && (

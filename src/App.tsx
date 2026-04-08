@@ -24,6 +24,7 @@ function App() {
   const logout = useStore((state) => state.logout);
   const setAnalyzing = useStore((state) => state.setAnalyzing);
   const setAnalysisResult = useStore((state) => state.setAnalysisResult);
+  const fetchMe = useStore((state) => state.fetchMe);
   
   const [loading, setLoading] = useState(true);
   const [showIntro, setShowIntro] = useState(true);
@@ -31,8 +32,7 @@ function App() {
   // 🔌 소켓 이벤트 핸들링
   useEffect(() => {
     if (user) {
-      // 룸 접속 시 userId와 cohortId 전달 (강사는 cohortId가 null일 수 있으므로 처리 필요)
-      socket.emit('join', { userId: user.id, cohortId: user.role === 'student' ? user.cohort_id : 1 }); 
+      socket.emit('join', { userId: user.id, classId: user.class_id ?? null });
 
       socket.on('analysis_started', () => {
         setAnalyzing(true);
@@ -44,7 +44,7 @@ function App() {
           summary: data.summary,
           dominantEmotion: data.dominantEmotion
         });
-        // ✅ 여기서 알림 토스트 등을 띄울 수 있음
+        fetchMe(); // 캔디 카운트 갱신
         console.log("AI 분석 완료:", data);
       });
 
@@ -59,7 +59,7 @@ function App() {
       socket.off('analysis_completed');
       socket.off('analysis_failed');
     };
-  }, [user, setAnalyzing, setAnalysisResult]);
+  }, [user, setAnalyzing, setAnalysisResult, fetchMe]);
 
   const restoreSession = useCallback(async () => {
     const token = localStorage.getItem('yummy_token');
