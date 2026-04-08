@@ -3,11 +3,37 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Star, ArrowUpRight, Sparkles, Quote, History, BrainCircuit, Activity, Package, Gamepad2 } from 'lucide-react';
 
+/* 아바타 개발을 위한 임시 작업 DB 작업후 수정 필요 */
+// import { MOCK_ITEMS } from '../data/Avatar';
+
 export default function Jar() {
   const { user, emotions = [], collection = [], fetchHistory, fetchMe, fetchCollection, drawItem, toggleEquip } = useStore();
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [lastDrawnItem, setLastDrawnItem] = useState<any>(null);
-  
+  const [phase, setPhase] = useState<
+   'idle' | 'egg' | 'shake' | 'flash' | 'crack' | 'reveal'
+   >('idle');
+
+   const [result, setResult] = useState<any>(null);
+   const [drawGrade, setDrawGrade] = useState<string | null>(null);
+   const [isDrawing, setIsDrawing] = useState(false);
+   const [lastDrawnItem, setLastDrawnItem] = useState<any>(null);
+   
+   type Grade = 'common' | 'rare' | 'unique' | 'epic';
+   const gradeSequence : Record<Grade, string[]>= {
+      common: ['common'],
+      rare: ['common','rare'],
+      unique: ['common','rare','unique'],
+      epic: ['common','rare','unique','epic']
+   };
+   const [flashLayers, setFlashLayers] = useState<string[]>([]);
+
+   // 알 꺠는 색상 표시
+  const gradeColor = {
+   common: "#ffffff",
+   rare: "#60a5fa",
+   unique: "#a78bfa",
+   epic: "#fd4d08"
+   };
+
   useEffect(() => {
     if (user) {
       fetchHistory();
@@ -17,22 +43,79 @@ export default function Jar() {
   }, [user?.id]);
 
   const handleDraw = async () => {
-    if ((user?.current_candy_count || 0) < 1) {
-       alert("캔디가 부족해요! 리플렉션을 작성해서 캔디를 모아보세요. 🍬");
-       return;
-    }
-    setIsDrawing(true);
-    const res = await drawItem();
-    if (res.success) {
-       setLastDrawnItem(res.item);
-       setTimeout(() => setLastDrawnItem(null), 3000);
-    } else {
-       alert(res.message);
-    }
+  if (isDrawing) return;
+  setIsDrawing(true);
+
+  // 캔디 부족 체크
+  if ((user?.current_candy_count || 0) < 2) {
+    alert("캔디가 부족해요! 리플렉션을 작성해서 캔디를 모아보세요. 🍬");
     setIsDrawing(false);
+    return;
+  }
+
+  // 아이템 뽑기
+  const res = await drawItem();
+  if (!res.success) {
+    alert(res.message);
+    setIsDrawing(false);
+    return;
+  }
+
+  // 단계별 시간 변수화
+  const gradeSequence: Record<Grade, string[]> = {
+    common: ["common"],
+    rare: ["common", "rare"],
+    unique: ["common", "rare", "unique"],
+    epic: ["common", "rare", "unique", "epic"],
   };
+  const sequence = gradeSequence[res.item.grade as Grade];
+
+  const eggTime = 0;
+  const shakeTime = 600;
+  const crackTime = 1100;
+  const flashStart = 1500;
+  const revealTime = 1900 + sequence.length * 1100;
+  const endTime = 4500 + sequence.length * 1100;
+
+  // 알 등장
+  setTimeout(() => setPhase("egg"), eggTime);
+
+  // 흔들림
+  setTimeout(() => setPhase("shake"), shakeTime);
+
+  // 깨짐
+  setTimeout(() => setPhase("crack"), crackTime);
+
+  // 등급별 번쩍임
+  sequence.forEach((g, index) => {
+    setTimeout(() => {
+      setDrawGrade(g as Grade);
+      setFlashLayers((prev) => [...prev, gradeColor[g as Grade]]);
+      setPhase("flash");
+    }, flashStart + index * 1100);
+  });
+
+  // 결과 등장
+  setTimeout(() => {
+  setResult(res.item);          // 여기서 결과 넣기
+  setDrawGrade(res.item.grade);
+  setLastDrawnItem(res.item);
+  setTimeout(() => setLastDrawnItem(null), 3000);
+
+  setPhase("reveal");
+}, revealTime);
+
+  // 종료: 초기화
+  setTimeout(() => {
+    setPhase("idle");
+    setResult(null);
+    setIsDrawing(false);
+    setFlashLayers([]);
+  }, endTime);
+};
 
   const equippedItems = useMemo(() => collection.filter(i => i.is_equipped), [collection]);
+  const currentColor = drawGrade ? gradeColor[drawGrade as keyof typeof gradeColor] : "#ffffff";
 
   const graphData = useMemo(() => {
     return [...emotions].reverse().slice(-7).map((item) => ({
@@ -81,12 +164,12 @@ export default function Jar() {
                    {equippedItems.map((item) => (
                       <div key={item.id} className="absolute inset-0 flex items-center justify-center pointer-events-none">
                          <div className="bg-brand-primary/20 px-2 py-1 rounded text-[8px] font-bold text-brand-primary border border-brand-primary/10">
-                            {item.item_id} 착용 중
+                            {item.collection_id} 착용 중
                          </div>
                       </div>
                    ))}
                 </div>
-                {collection.some(i => i.item_type === 'background' && i.is_equipped) && (
+                {collection.some(i => i.Collection.item_type === 'background' && i.is_equipped) && (
                    <div className="absolute inset-0 bg-gradient-to-b from-brand-mint/10 to-transparent -z-10 rounded-3xl" />
                 )}
              </div>
@@ -102,7 +185,7 @@ export default function Jar() {
                   }`}
                 >
                   <Sparkles className={isDrawing ? "animate-spin" : "text-brand-yellow"} size={18} />
-                  {isDrawing ? "뽑는 중..." : "캔디 1개로 랜덤 뽑기"}
+                  {isDrawing ? "뽑는 중..." : "캔디 2개로 랜덤 뽑기"}
                 </motion.button>
              </div>
 
@@ -124,18 +207,45 @@ export default function Jar() {
           <div className="bg-brand-surface/5 rounded-[2.5rem] p-6 max-h-[300px] overflow-y-auto space-y-4 border border-brand-surface/20">
              <h4 className="text-[10px] font-black text-brand-primary/40 uppercase tracking-[0.2em] px-2 mb-4">My Collection ({collection.length})</h4>
              <div className="grid grid-cols-4 gap-3">
-                {collection.map((item) => (
-                   <motion.button
-                     key={item.id}
-                     whileHover={{ scale: 1.1 }}
-                     onClick={() => toggleEquip(item.item_id)}
-                     className={`aspect-square rounded-2xl border-2 flex items-center justify-center transition-all ${
-                       item.is_equipped ? 'border-brand-primary bg-brand-primary/10 shadow-lg' : 'border-white bg-white/40 hover:bg-white'
-                     }`}
-                   >
-                      <span className="text-[10px] font-bold text-brand-primary">{item.item_id}</span>
-                   </motion.button>
-                ))}
+                {collection.map((item) => {
+  const avatar = item.Collection;
+
+  return (
+    <motion.button
+      key={item.id}
+      whileHover={{ scale: 1.1 }}
+      onClick={() => toggleEquip(item.collection_id)}
+      className={`aspect-square rounded-2xl border-2 overflow-hidden flex items-center justify-center transition-all ${
+        item.is_equipped
+          ? 'border-brand-primary bg-brand-primary/10 shadow-lg'
+          : 'border-white bg-white/40 hover:bg-white'
+      }`}
+    >
+      {avatar?.video_url ? (
+        <video
+          src={avatar.video_url}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover"
+        />
+      ) : avatar?.image_url ? (
+        <img
+          src={avatar.image_url}
+          alt={avatar.name}
+          className="w-full h-full object-contain p-1"
+        />
+      ) : (
+        <Sparkles size={16} className="text-brand-primary/30" />
+      )}
+
+      {item.is_equipped && (
+        <div className="absolute top-1 right-1 w-2 h-2 bg-brand-primary rounded-full" />
+      )}
+    </motion.button>
+  );
+})}
                 {collection.length === 0 && (
                    <div className="col-span-4 py-8 text-center text-brand-primary/30 text-[10px] font-bold">
                       아직 수집한 아이템이 없어요.
@@ -221,6 +331,180 @@ export default function Jar() {
           </section>
         </main>
       </div>
+      <AnimatePresence>
+      {phase !== 'idle' && (
+      <motion.div
+         className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+         initial={{ opacity: 0 }}
+         animate={{ opacity: 1 }}
+         exit={{ opacity: 0 }}
+      >
+         
+         {/* 빛 효과 */}
+         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+  <AnimatePresence> {/* mode="wait" 삭제: 빛이 겹치며 전환됨 */}
+    {phase === 'flash' && (
+      <motion.div
+        key={drawGrade} // 등급이 바뀔 때마다 새로운 레이어 생성
+        initial={{ opacity: 0, scale: 0.8 }}
+        animate={{ 
+          opacity: [0, 1, 0.8], 
+          scale: [0.8, 1.5, 1.2] 
+        }}
+        exit={{ opacity: 0, scale: 2, transition: { duration: 0.8 } }} // 서서히 커지며 사라짐
+        transition={{ duration: 1, ease: "easeOut" }}
+        className="absolute flex items-center justify-center"
+      >
+        {/* 1. 메인 부드러운 광원 (배경 색상 채우기) */}
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-60"
+          style={{ background: currentColor }}
+        />
+
+        {/* 2. 강력한 중앙 폭발 (번쩍이는 임팩트) */}
+        <motion.div
+          className="absolute w-[400px] h-[400px] rounded-full blur-[60px]"
+          style={{ background: `radial-gradient(circle, #ffffff 0%, ${currentColor} 70%)` }}
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.2, 1] }}
+          transition={{ duration: 0.5, ease: "backOut" }}
+        />
+
+        {/* 3. 빠르게 퍼져나가는 충격파 링 */}
+        <motion.div
+          className="absolute rounded-full border-[10px]"
+          style={{ borderColor: currentColor }}
+          initial={{ width: 100, height: 100, opacity: 1, borderWidth: "10px" }}
+          animate={{ 
+            width: 1000, 
+            height: 1000, 
+            opacity: 0, 
+            borderWidth: "1px" 
+          }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        />
+      </motion.div>
+    )}
+  </AnimatePresence>
+</div>
+         {/* 알 */}
+         {phase !== 'reveal' && (
+         <motion.div
+            animate={
+               phase === 'shake'
+               ? { rotate: [0, -10, 10, -8, 8, 0] }
+
+               : phase === 'flash'
+               ? {
+                  opacity: 0.35,
+                  scale: 0.95
+               }
+               
+               : phase === 'crack'
+               ? {
+                     scale:[1,1.05,0.95,0],
+                     opacity:[1,1,0]
+                  }
+               : {}
+            }
+            transition={{ duration: 0.6 }}
+            className="relative"
+         >
+            <div className="w-40 h-52 bg-white rounded-full shadow-2xl border-4 border-white" />
+
+            {/* 지그재그 금 */}
+            {phase !== 'egg' && phase !== 'shake' && (
+            <motion.svg
+               className="absolute inset-0 w-full h-full"
+               viewBox="0 0 100 120"
+               initial={{ pathLength: 0, opacity: 0 }}
+               animate={{ pathLength: 1, opacity: 1 }}
+               transition={{ duration: 0.25 }}
+            >
+               <motion.path
+                  d="M10 60 
+                     L25 55 
+                     L40 65 
+                     L55 55 
+                     L70 65 
+                     L85 60"
+                  stroke="gray"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+               />
+            </motion.svg>
+            )}
+
+         </motion.div>
+         )}
+
+         {/* 결과 카드 */}
+         {phase === 'reveal' && result && (
+         <>
+            {/* 후광 */}
+            <motion.div
+               className="absolute w-[500px] h-[500px] rounded-full blur-[120px]"
+               style={{ background: currentColor }}
+               initial={{ scale: 0.5, opacity: 0 }}
+               animate={{ scale: 1.5, opacity: 0.4 }}
+               transition={{ duration: 0.8 }}
+            />
+
+            {/* 실제 결과 카드 디자인 */}
+            <motion.div
+               initial={{ scale: 0.2, opacity: 0, rotate: -15, y: 50 }}
+               animate={{ scale: 1, opacity: 1, rotate: 0, y: 0 }}
+               transition={{ type: "spring", stiffness: 260, damping: 20 }}
+               className="relative z-50 flex flex-col items-center"
+            >
+               <div className="bg-white/90 backdrop-blur-md p-5 rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-4 border-white w-80 overflow-hidden">
+               
+               {/* 🎬 미디어 영역: 비디오 우선, 없으면 이미지 */}
+               <div className="relative w-full aspect-square bg-gray-50 rounded-[2rem] overflow-hidden mb-6 shadow-inner flex items-center justify-center">
+                  {result.video_url ? (
+                     <video 
+                     src={result.video_url} 
+                     autoPlay 
+                     loop 
+                     muted 
+                     playsInline 
+                     className="w-full h-full object-cover"
+                     />
+                  ) : result.image_url ? (
+                     <img 
+                     src={result.image_url} 
+                     alt={result.name}
+                     className="w-full h-full object-contain p-4"
+                     />
+                  ) : (
+                     /* 데이터가 없을 때의 기본 아이콘 */
+                     <Sparkles size={60} className="text-brand-primary/20" />
+                  )}
+               </div>
+
+               {/* 하단 텍스트 정보 */}
+               <div className="text-center pb-2">
+                  <p className="text-[11px] font-black text-brand-primary/30 uppercase tracking-[0.2em] mb-1">
+                     New Item Unlocked
+                  </p>
+                  <h2 className="text-2xl font-black text-brand-primary leading-tight mb-1">
+                     {result.name}
+                  </h2>
+                  <p className="text-[12px] font-bold opacity-50" style={{ color: currentColor }}>
+                     {result.grade === 'epic' ? '✨ Legendary Discovery ✨' : 'Collection Updated'}
+                  </p>
+               </div>
+               </div>
+               
+               {/* 바닥 그림자 효과 */}
+               <div className="w-40 h-6 bg-black/20 blur-xl rounded-full mt-8" />
+            </motion.div>
+         </>
+         )}
+      </motion.div>
+      )}
+      </AnimatePresence>
     </motion.div>
   );
 }

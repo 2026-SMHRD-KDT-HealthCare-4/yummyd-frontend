@@ -28,9 +28,18 @@ interface CandyPost {
 
 interface CollectionItem {
   id: number;
-  item_id: string;
-  item_type: 'hat' | 'glass' | 'accessory' | 'background';
+  user_id: number;
+  collection_id: number;
   is_equipped: boolean;
+
+  Collection: {
+    id: number;
+    name: string;
+    grade: string;
+    item_type: string;
+    image_url: string | null;
+    video_url: string | null;
+  };
 }
 
 interface YummyState {
@@ -57,7 +66,7 @@ interface YummyState {
   fetchBoard: () => Promise<void>;
   fetchCollection: () => Promise<void>;
   drawItem: () => Promise<{ success: boolean; item?: any; message?: string }>;
-  toggleEquip: (itemId: string) => Promise<void>;
+  toggleEquip: (itemId: number) => Promise<void>;
   addCandyPost: (text: string) => { success: boolean; message: string };
   deleteCandyPost: (id: number) => void;
   editCandyPost: (id: number, newText: string) => void;
