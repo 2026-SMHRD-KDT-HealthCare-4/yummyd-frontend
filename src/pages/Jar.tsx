@@ -115,7 +115,6 @@ export default function Jar() {
 };
 
   const equippedItems = useMemo(() => collection.filter(i => i.is_equipped), [collection]);
-
   const currentColor = drawGrade ? gradeColor[drawGrade as keyof typeof gradeColor] : "#ffffff";
 
   const graphData = useMemo(() => {
@@ -165,12 +164,12 @@ export default function Jar() {
                    {equippedItems.map((item) => (
                       <div key={item.id} className="absolute inset-0 flex items-center justify-center pointer-events-none">
                          <div className="bg-brand-primary/20 px-2 py-1 rounded text-[8px] font-bold text-brand-primary border border-brand-primary/10">
-                            {item.item_id} 착용 중
+                            {item.collection_id} 착용 중
                          </div>
                       </div>
                    ))}
                 </div>
-                {collection.some(i => i.item_type === 'background' && i.is_equipped) && (
+                {collection.some(i => i.Collection.item_type === 'background' && i.is_equipped) && (
                    <div className="absolute inset-0 bg-gradient-to-b from-brand-mint/10 to-transparent -z-10 rounded-3xl" />
                 )}
              </div>
@@ -208,18 +207,45 @@ export default function Jar() {
           <div className="bg-brand-surface/5 rounded-[2.5rem] p-6 max-h-[300px] overflow-y-auto space-y-4 border border-brand-surface/20">
              <h4 className="text-[10px] font-black text-brand-primary/40 uppercase tracking-[0.2em] px-2 mb-4">My Collection ({collection.length})</h4>
              <div className="grid grid-cols-4 gap-3">
-                {collection.map((item) => (
-                   <motion.button
-                     key={item.id}
-                     whileHover={{ scale: 1.1 }}
-                     onClick={() => toggleEquip(item.item_id)}
-                     className={`aspect-square rounded-2xl border-2 flex items-center justify-center transition-all ${
-                       item.is_equipped ? 'border-brand-primary bg-brand-primary/10 shadow-lg' : 'border-white bg-white/40 hover:bg-white'
-                     }`}
-                   >
-                      <span className="text-[10px] font-bold text-brand-primary">{item.item_id}</span>
-                   </motion.button>
-                ))}
+                {collection.map((item) => {
+  const avatar = item.Collection;
+
+  return (
+    <motion.button
+      key={item.id}
+      whileHover={{ scale: 1.1 }}
+      onClick={() => toggleEquip(item.collection_id)}
+      className={`aspect-square rounded-2xl border-2 overflow-hidden flex items-center justify-center transition-all ${
+        item.is_equipped
+          ? 'border-brand-primary bg-brand-primary/10 shadow-lg'
+          : 'border-white bg-white/40 hover:bg-white'
+      }`}
+    >
+      {avatar?.video_url ? (
+        <video
+          src={avatar.video_url}
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="w-full h-full object-cover"
+        />
+      ) : avatar?.image_url ? (
+        <img
+          src={avatar.image_url}
+          alt={avatar.name}
+          className="w-full h-full object-contain p-1"
+        />
+      ) : (
+        <Sparkles size={16} className="text-brand-primary/30" />
+      )}
+
+      {item.is_equipped && (
+        <div className="absolute top-1 right-1 w-2 h-2 bg-brand-primary rounded-full" />
+      )}
+    </motion.button>
+  );
+})}
                 {collection.length === 0 && (
                    <div className="col-span-4 py-8 text-center text-brand-primary/30 text-[10px] font-bold">
                       아직 수집한 아이템이 없어요.
