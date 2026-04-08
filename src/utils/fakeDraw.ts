@@ -1,5 +1,5 @@
 /* data폴더와 동일하게 임시로 작업을 위한 로직 함수를 저장하기 위한 공간 */
-import { MOCK_ITEMS } from '../../../yummyd-backend/data/Avatar';
+import { Avatars } from '../../../yummyd-backend/data/Avatar';
 type Grade = 'common' | 'rare' | 'unique' | 'epic';
 
 type Item = {
@@ -32,7 +32,7 @@ export const fakeDraw = (
 ): { success: boolean; item?: Item; message?: string } => {
   const ownedIds = collection.map(i => i.id);
 
-  const available = MOCK_ITEMS.filter(item => !ownedIds.includes(item.id));
+  const available = Avatars.filter(item => !ownedIds.includes(item.id));
 
   if (available.length === 0) {
     return { success: false, message: "모든 아바타를 이미 가지고 있어요!" };
