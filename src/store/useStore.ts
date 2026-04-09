@@ -103,8 +103,11 @@ export const useStore = create<YummyState>((set, get) => ({
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) {
-        set({ collection: res.data.data });
-      }
+       const sortedCollection = res.data.data.sort(
+        (a: CollectionItem, b: CollectionItem) => a.Collection.id - b.Collection.id
+      );
+      set({ collection: sortedCollection });
+    }
     } catch (err) {
       console.error('Failed to fetch collection:', err);
     }
@@ -120,7 +123,7 @@ export const useStore = create<YummyState>((set, get) => ({
       });
       if (res.data.success) {
         await get().fetchMe();
-        await get().fetchCollection();
+        //await get().fetchCollection();
         return { success: true, item: res.data.item };
       }
       return { success: false, message: res.data.message };
