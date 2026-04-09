@@ -3,9 +3,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Star, ArrowUpRight, Sparkles, Quote, History, BrainCircuit, Activity, Package, Gamepad2 } from 'lucide-react';
 
-/* 아바타 개발을 위한 임시 작업 DB 작업후 수정 필요 */
-// import { MOCK_ITEMS } from '../data/Avatar';
-
 export default function Jar() {
   const { user, emotions = [], collection = [], fetchHistory, fetchMe, fetchCollection, drawItem, toggleEquip } = useStore();
   const [phase, setPhase] = useState<
@@ -16,6 +13,7 @@ export default function Jar() {
    const [drawGrade, setDrawGrade] = useState<string | null>(null);
    const [isDrawing, setIsDrawing] = useState(false);
    const [lastDrawnItem, setLastDrawnItem] = useState<any>(null);
+   const [currentAvatar, setCurrentAvatar] = useState<any>(null);
    
    type Grade = 'common' | 'rare' | 'unique' | 'epic';
    const gradeSequence : Record<Grade, string[]>= {
@@ -42,6 +40,14 @@ export default function Jar() {
     }
   }, [user?.id]);
 
+  useEffect(() => {
+  // 컬렉션 중 착용 중인 아이템 찾기
+  const equipped = collection.find(i => i.is_equipped);
+  if (equipped) {
+    setCurrentAvatar(equipped.Collection); // 화면에 표시
+  }
+}, [collection]);
+
   const handleDraw = async () => {
   if (isDrawing) return;
   setIsDrawing(true);
@@ -61,13 +67,6 @@ export default function Jar() {
     return;
   }
 
-  // 단계별 시간 변수화
-  const gradeSequence: Record<Grade, string[]> = {
-    common: ["common"],
-    rare: ["common", "rare"],
-    unique: ["common", "rare", "unique"],
-    epic: ["common", "rare", "unique", "epic"],
-  };
   const sequence = gradeSequence[res.item.grade as Grade];
 
   const eggTime = 0;
@@ -162,20 +161,32 @@ export default function Jar() {
              {/* 아바타 디스플레이 영역 */}
              <div className="relative w-full h-[320px] flex items-center justify-center mt-6">
                 <div className="relative w-48 h-48">
-                   <img src="/src/assets/yummyd_character_pure.png" alt="Avatar" className="w-full h-full object-contain drop-shadow-2xl" />
-                   {equippedItems.map((item) => (
-                      <div key={item.id} className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                         <div className="bg-brand-primary/20 px-2 py-1 rounded text-[8px] font-bold text-brand-primary border border-brand-primary/10">
-                            {item.collection_id} 착용 중
-                         </div>
-                      </div>
-                   ))}
+                   <div className="relative w-48 h-48">
+  {currentAvatar?.video_url ? (
+    <video
+      src={currentAvatar.video_url}
+      autoPlay
+      loop
+      muted
+      playsInline
+      className="w-full h-full object-cover"
+    />
+  ) : (
+    <img
+      src={currentAvatar?.image_url || "/src/assets/yummyd_character_pure.png"}
+      alt="Avatar"
+      className="w-full h-full object-contain drop-shadow-2xl"
+    />
+  )}
+</div>
+                   
                 </div>
                 {collection.some(i => i.Collection.item_type === 'background' && i.is_equipped) && (
                    <div className="absolute inset-0 bg-gradient-to-b from-brand-mint/10 to-transparent -z-10 rounded-3xl" />
-                )}
+                )}<div className="mt-4 text-center">
+</div>  
              </div>
-
+              
              <div className="w-full space-y-4">
                 <motion.button 
                   whileHover={{ scale: 1.02 }} 
@@ -199,7 +210,7 @@ export default function Jar() {
                      exit={{ opacity: 0, scale: 0.5 }} 
                      className="absolute inset-x-8 bottom-32 bg-white border-2 border-brand-yellow p-4 rounded-2xl shadow-2xl z-20 flex flex-col items-center gap-2"
                    >
-                      <p className="text-[10px] font-black text-brand-yellow uppercase tracking-widest">New Item!</p>
+                      <p className="text-[10px] font-black text-brand-yellow uppercase tracking-widest">새로운 아바타!</p>
                       <p className="text-lg font-black text-brand-primary">{lastDrawnItem.name}</p>
                    </motion.div>
                 )}
@@ -216,7 +227,10 @@ export default function Jar() {
     <motion.button
       key={item.id}
       whileHover={{ scale: 1.1 }}
-      onClick={() => toggleEquip(item.collection_id)}
+      onClick={async () => {
+  await toggleEquip(item.collection_id);  // 서버 DB 업데이트
+  setCurrentAvatar(item.Collection);      // 화면 즉시 변경
+}}
       className={`aspect-square rounded-2xl border-2 overflow-hidden flex items-center justify-center transition-all ${
         item.is_equipped
           ? 'border-brand-primary bg-brand-primary/10 shadow-lg'
