@@ -98,10 +98,7 @@ export const useStore = create<YummyState>((set, get) => ({
     const { user } = get();
     if (!user) return;
     try {
-      const token = localStorage.getItem('yummy_token');
-      const res = await axios.get(`/api/collection/${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(`/api/collection/${user.id}`);
       if (res.data.success) {
         set({ collection: res.data.data });
       }
@@ -110,14 +107,25 @@ export const useStore = create<YummyState>((set, get) => ({
     }
   },
 
+  updateReflection: async (id: number, data: any) => {
+    try {
+      const res = await axios.put(`/api/update/${id}`, data);
+      if (res.data.success) {
+        await get().fetchHistory(); // 기록 갱신
+        return { success: true };
+      }
+      return { success: false, message: res.data.message };
+    } catch (err: any) {
+      return { success: false, message: err.message };
+    }
+  },
+
   drawItem: async () => {
     const { user } = get();
     if (!user) return { success: false, message: "로그인이 필요합니다." };
     try {
-      const token = localStorage.getItem('yummy_token');
-      const res = await axios.post('/api/collection/draw', { userId: user.id }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // [무료화 반영] 캔디 체크 없이 즉시 호출
+      const res = await axios.post('/api/collection/draw', { userId: user.id });
       if (res.data.success) {
         await get().fetchMe();
         await get().fetchCollection();
@@ -133,10 +141,7 @@ export const useStore = create<YummyState>((set, get) => ({
     const { user } = get();
     if (!user) return;
     try {
-      const token = localStorage.getItem('yummy_token');
-      await axios.post('/api/collection/toggle-equip', { userId: user.id, itemId }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post('/api/collection/toggle-equip', { userId: user.id, itemId });
       await get().fetchCollection();
     } catch (err) {
       console.error('Failed to toggle equip:', err);

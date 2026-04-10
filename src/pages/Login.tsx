@@ -20,7 +20,11 @@ const Login: React.FC = () => {
     e.preventDefault();
     if (!isPasswordValid) return;
     try {
-      const res = await axios.post('/api/auth/login', formData);
+      // login_type을 명시적으로 포함하여 전송 (기본값 user)
+      const res = await axios.post('/api/auth/login', {
+        ...formData,
+        login_type: 'user' 
+      });
       if (res.data.success) {
         setUser(res.data.user);
         localStorage.setItem('yummy_token', res.data.token);
