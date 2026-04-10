@@ -1,12 +1,23 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
-import { Sparkles, Image as ImageIcon, X } from 'lucide-react';
+import { 
+  Sparkles, Image as ImageIcon, X, Heart, BookOpen, Target, 
+  CheckCircle2, MessageSquare, PlusCircle, Star, Cloud, 
+  Zap, Compass, Rocket, Quote, Wand2, RefreshCw
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 import yummyPure from '../assets/yummyd_character_pure.png';
 import yummyWink from '../assets/yummyd_character_wink.png';
+
+// 캔디 이모지 자산 임포트
+import candyHappy from '../assets/candyEmoji_happy.png';
+import candyNormal from '../assets/candyEmoji_normal.png';
+import candySad from '../assets/candyEmoji_sad.png';
+import candyTired from '../assets/candyEmoji_tired.png';
+import candyAngry from '../assets/candyEmoji_angry.png';
 
 // ─── 타입 ───────────────────────────────────────────────
 type EmotionKey = 'happy' | 'normal' | 'sad' | 'tired' | 'angry';
@@ -20,12 +31,12 @@ interface Spell {
 }
 
 // ─── 데이터 ──────────────────────────────────────────────
-const EMOTIONS: { key: EmotionKey; emoji: string; label: string; spellType: SpellType }[] = [
-  { key: 'happy',  emoji: '😊', label: '좋아요',   spellType: 'positive' },
-  { key: 'normal', emoji: '😐', label: '보통이요',  spellType: 'neutral'  },
-  { key: 'sad',    emoji: '😔', label: '슬퍼요',   spellType: 'negative' },
-  { key: 'tired',  emoji: '😩', label: '지쳐요',   spellType: 'burnout'  },
-  { key: 'angry',  emoji: '😤', label: '짜증나요',  spellType: 'anger'    },
+const EMOTIONS: { key: EmotionKey; img: string; label: string; spellType: SpellType }[] = [
+  { key: 'happy',  img: candyHappy,   label: '좋아요',   spellType: 'positive' },
+  { key: 'normal', img: candyNormal,  label: '보통이요',  spellType: 'neutral'  },
+  { key: 'sad',    img: candySad,     label: '슬퍼요',   spellType: 'negative' },
+  { key: 'tired',  img: candyTired,   label: '지쳐요',   spellType: 'burnout'  }, // candyAnxious -> candyTired 교정
+  { key: 'angry',  img: candyAngry,   label: '짜증나요',  spellType: 'anger'    },
 ];
 
 const SPELL_ICONS = ['⭐', '🌟', '✨', '🌈', '🍀', '🌊', '🕊️', '🌙', '💫', '🌿'];
@@ -71,7 +82,7 @@ const SPELL_DATA: Record<SpellType, string[]> = {
     '숨 한 번 쉬자, 그것만으로 충분해',
     '나는 지금까지 정말 많이 버텨왔다',
     '쉬는 것도 하나의 일이야, 죄책감 갖지 않아도 돼',
-    '오늘은 여기까지만, 그것으로 충분히 잘 했어',
+    '오늘의 나는 여기까지만, 그것으로 충분히 잘 했어',
     '지친 나를 몰아붙이지 않겠다',
     '내 몸과 마음이 쉬고 싶다고 말하는 거야, 들어줄게',
     '모든 걸 다 잘할 필요는 없어',
@@ -94,8 +105,7 @@ const SPELL_DATA: Record<SpellType, string[]> = {
 };
 
 const SPELL_PLACEHOLDER_MAP: Record<string, string> = {
-  // 좋아요
-  '나는 지금 이 순간을 온전히 누릴 자격이 있다':       '지금 이 순간, 어떤 기분이 느껴지나요? 그대로 적어봐요',
+  '나는 지금 이 순간을 온전히 누릴 자격이 있다':       '지금 이 순간, 어떤 기분이 느껴지나요?',
   '이 기분은 내가 살아있다는 증거야':                   '오늘 살아있음을 느끼게 해준 것이 있나요?',
   '좋은 일은 계속해서 내게로 흘러온다':                 '오늘 나에게 흘러온 작은 좋은 일을 적어볼까요?',
   '잘 되는 건 당연한 일이야, 나니까':                   '오늘 나답게 잘 해낸 것, 하나만 써봐요',
@@ -105,18 +115,16 @@ const SPELL_PLACEHOLDER_MAP: Record<string, string> = {
   '이 에너지가 오래도록 나와 함께하기를':               '지금 이 에너지로 하고 싶은 게 있나요?',
   '나는 내가 원하는 삶의 방향으로 가고 있다':           '지금 나는 어디로 향하고 있는 것 같나요?',
   '오늘의 이 감정을 기억하자, 반드시 다시 돌아올 거야': '지금 이 감정을 미래의 나에게 한 마디로 남겨봐요',
-  // 보통이에요
   '굳이 특별한 감정을 만들지 않아도 돼':                '특별하지 않은 오늘, 그냥 있는 그대로 적어봐요',
   '그냥 존재하는 것만으로도 오늘은 합격이야':           '오늘 존재하면서 한 것 중 하나만 적어볼까요?',
   '설레지 않아도 내 하루는 충분히 유효하다':            '설레진 않았지만, 오늘 있었던 일을 담담하게 적어봐요',
   '조용한 날들이 쌓여서 단단한 내가 만들어진다':        '요즘 조용히 쌓이고 있는 것이 있나요?',
   '지금 이 평온함, 나쁘지 않아':                        '지금 이 고요함 속에서 뭐가 느껴지나요?',
   '드라마틱하지 않아도 나는 잘 살아가고 있다':          '별일 없는 오늘, 그래도 내가 해낸 것은요?',
-  '오늘은 아무 색도 아닌 날, 그래도 나쁘지 않아':      '오늘을 색으로 표현한다면 어떤 색일 것 같아요?',
+  '오늘의 아무 색도 아닌 날, 그래도 나쁘지 않아':      '오늘을 색으로 표현한다면 어떤 색일 것 같아요?',
   '아무것도 느끼지 못하는 것도 하나의 감정이야':        '지금 아무것도 느껴지지 않는다면, 그것도 써봐도 돼요',
   '지금 이 무감각은 쉬어가는 중인 거야':                '요즘 나의 마음이 쉬고 싶어하는 것 같나요?',
   '작은 것 하나에만 집중해보자, 지금 이 온도, 이 숨소리': '지금 이 순간 느껴지는 감각을 하나만 적어볼까요?',
-  // 슬퍼요
   '지금 힘든 게 맞아, 괜찮지 않아도 돼':               '지금 힘든 것, 여기에 그냥 털어놓아도 괜찮아요',
   '이 슬픔은 내가 무언가를 소중히 여긴다는 뜻이야':    '지금 나에게 소중한 게 뭔지 느껴지나요?',
   '울어도 괜찮아, 눈물은 막힌 것을 흘려보내는 거야':   '지금 흘려보내고 싶은 것이 있나요?',
@@ -125,20 +133,18 @@ const SPELL_PLACEHOLDER_MAP: Record<string, string> = {
   '슬픔을 느낀다는 건 내가 아직 살아있다는 거야':       '지금 내 안에서 살아있는 감정을 적어봐요',
   '지금 당장 해결하지 않아도 된다':                     '지금 당장 해결하지 않아도 되는 것, 내려놓아봐요',
   '이 어둠 속에서도 나는 나를 잃지 않는다':             '지금 어둠 속에서도 내가 붙잡고 있는 것은요?',
-  '나는 나를 포기하지 않는다':                          '지금 나 자신에게 해주고 싶은 말이 있나요?',
+  '나는 나를 포기하지 않는다':                          '지금 나 자신에게 해주고 말이 있나요?',
   '나에게 다정하게 대해줄 사람은 먼저 나 자신이야':     '지금 나에게 가장 필요한 다정한 말 한마디는요?',
-  // 지쳐요
   '숨 한 번 쉬자, 그것만으로 충분해':                   '숨을 고르고 나서, 지금 떠오르는 것을 적어봐요',
   '나는 지금까지 정말 많이 버텨왔다':                   '내가 버텨온 것들 중 하나만 꺼내봐요, 잘 해왔어요',
   '쉬는 것도 하나의 일이야, 죄책감 갖지 않아도 돼':    '요즘 쉬지 못하게 만드는 것이 있나요?',
-  '오늘은 여기까지만, 그것으로 충분히 잘 했어':         '오늘 내가 해낸 것 중 딱 하나만, 스스로 인정해줘요',
+  '오늘의 나는 여기까지만, 그것으로 충분히 잘 했어':         '오늘 내가 해낸 것 중 딱 하나만, 스스로 인정해줘요',
   '지친 나를 몰아붙이지 않겠다':                        '요즘 나를 가장 지치게 만드는 게 뭔가요?',
   '내 몸과 마음이 쉬고 싶다고 말하는 거야, 들어줄게':  '지금 몸과 마음이 원하는 게 뭔지 느껴지나요?',
   '모든 걸 다 잘할 필요는 없어':                        '요즘 내가 너무 많이 짊어지고 있는 것이 있나요?',
   '잠깐 멈추는 건 포기가 아니야':                       '지금 잠깐 멈추고 싶은 이유를 적어봐요',
   '나는 소진되면서까지 증명할 것이 없다':               '요즘 내가 누구에게, 무엇을 증명하려 했던 것 같나요?',
   '지금 이 피로는, 내가 열심히 살아온 증거야':          '오늘 이 피로를 만들어낸 나의 하루는 어땠나요?',
-  // 짜증나요
   '짜증나는 게 맞아, 그럴 만 하니까':                   '지금 뭐가 가장 짜증나나요? 여기선 솔직해도 돼요',
   '이 감정은 신호야, 내가 뭔가를 원하고 있다는 뜻이야': '지금 내가 진짜 원하는 게 뭔지 느껴지나요?',
   '지금 이 불쾌함은 내가 예민한 게 아니라 당연한 반응이야': '어떤 상황이 나를 불쾌하게 만들었나요?',
@@ -157,16 +163,40 @@ const pickRandom = <T,>(arr: T[], count: number): T[] =>
 const toSpells = (texts: string[], _spellType: SpellType | 'mixed' = 'mixed'): Spell[] =>
   texts.map((text, i) => ({
     icon: SPELL_ICONS[i % SPELL_ICONS.length],
-    main: `"${text}"`,
+    main: text,
     placeholder: SPELL_PLACEHOLDER_MAP[text] ?? '오늘 하루 어떤 감정이 가장 컸나요? 편하게 털어놔봐요 :)',
   }));
 
-const ACHIEVEMENTS: { key: AchievementKey; emoji: string; main: string; sub: string; color: string }[] = [
-  { key: 'clear', emoji: '🎉', main: '완전히 이해했다!',     sub: '오늘 목표 완벽 달성',      color: 'border-emerald-400 bg-emerald-50' },
-  { key: 'half',  emoji: '🔥', main: '절반 정도는 이해했다', sub: '반은 됐어요, 나머지는 내일!', color: 'border-amber-400 bg-amber-50'   },
-  { key: 'little',emoji: '🌱', main: '조금은 알겠다',        sub: '방향은 잡혔어요',           color: 'border-sky-400 bg-sky-50'       },
-  { key: 'retry', emoji: '😅', main: '다음에 다시 도전',     sub: '오늘은 좀 어려웠어요',      color: 'border-pink-400 bg-pink-50'     },
-];
+const ACHIEVEMENTS: Record<AchievementKey, { icon: JSX.Element; main: string; sub: string; color: string; activeColor: string }> = {
+  clear:  { icon: <CheckCircle2 size={22} />, main: '완벽 이해',     sub: '오늘 목표 완벽 달성',      color: 'border-gray-100 bg-white text-gray-400', activeColor: 'border-brand-mint bg-brand-mint/10 text-brand-primary' },
+  half:   { icon: <CheckCircle2 size={22} />, main: '절반 이해',     sub: '반은 됐어요, 나머지는 내일!', color: 'border-gray-100 bg-white text-gray-400', activeColor: 'border-brand-orange bg-brand-orange/10 text-brand-orange' },
+  little: { icon: <CheckCircle2 size={22} />, main: '조금 알겠음',     sub: '방향은 잡혔어요',           color: 'border-gray-100 bg-white text-gray-400', activeColor: 'border-brand-sky bg-brand-sky/10 text-brand-sky' },
+  retry:  { icon: <CheckCircle2 size={22} />, main: '다음에 다시',     sub: '오늘 좀 어려웠어요',      color: 'border-gray-100 bg-white text-gray-400', activeColor: 'border-brand-coral bg-brand-coral/10 text-brand-coral' },
+};
+
+// ─── 마법 입자 컴포넌트 ───────────────────────────────────
+function MagicParticle({ containerWidth }: { containerWidth: number }) {
+  return (
+    <div className="absolute inset-0 pointer-events-none overflow-visible">
+      {[...Array(6)].map((_, i) => (
+        <motion.div
+          key={i}
+          initial={{ opacity: 0, y: 0, x: 0, scale: 0 }}
+          animate={{ 
+            opacity: [0, 1, 0], 
+            y: -60 - Math.random() * 40,
+            x: (Math.random() - 0.5) * containerWidth,
+            scale: [0, 1.2, 0.5]
+          }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="absolute left-1/2 top-1/2 text-brand-purple"
+        >
+          <Star size={12 + Math.random() * 8} fill="currentColor" />
+        </motion.div>
+      ))}
+    </div>
+  );
+}
 
 // ─── 컴포넌트 ────────────────────────────────────────────
 export default function Reflection() {
@@ -180,6 +210,7 @@ export default function Reflection() {
   const [extraSpells, setExtraSpells] = useState<Spell[]>([]);
   const [emotionOneLine, setEmotionOneLine] = useState('');
   const [emotionImage, setEmotionImage] = useState<string | null>(null);
+  const [spellBurst, setSpellBurst] = useState(0);
 
   // 학습 섹션 상태
   const [todayGoal, setTodayGoal] = useState('');
@@ -198,15 +229,16 @@ export default function Reflection() {
 
   const emotionFileRef = useRef<HTMLInputElement>(null);
   const studyFileRef = useRef<HTMLInputElement>(null);
-  const freeTextStartRef = useRef<number | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+
+  const recordStartTime = () => {
+    if (!startTimeRef.current) startTimeRef.current = Date.now();
+  };
 
   const { user, setAnalyzing, isAnalyzing, fetchHistory, emotions } = useStore();
 
-  // 어제 복습 힌트
   const yesterdayReview = emotions[0]?.EDU_review ?? null;
 
-
-  // ─── 분석 상태 감시 ────────────────────────────────────
   useEffect(() => {
     const checkStatus = async () => {
       if (isAnalyzing && user) {
@@ -225,7 +257,6 @@ export default function Reflection() {
     }
   }, [isAnalyzing, user, fetchHistory, emotions, setAnalyzing]);
 
-
   useEffect(() => {
     let charInterval: ReturnType<typeof setInterval>;
     if (isTransitioning) {
@@ -237,7 +268,6 @@ export default function Reflection() {
     return () => clearInterval(charInterval);
   }, [isTransitioning]);
 
-  // ─── 이미지 처리 ───────────────────────────────────────
   const processImage = (file: File): Promise<string> => {
     setIsProcessing(true);
     return new Promise((resolve, reject) => {
@@ -290,7 +320,6 @@ export default function Reflection() {
     }
   };
 
-  // ─── 제출 ──────────────────────────────────────────────
   const canSubmit = !isTransitioning && (
     !!selectedEmotion || !!emotionOneLine.trim() || !!todayGoal.trim() || !!learned.trim()
   );
@@ -299,27 +328,27 @@ export default function Reflection() {
     if (!canSubmit) return;
     if (!user) return alert('로그인이 필요합니다.');
 
-    const delayMinutes = freeTextStartRef.current
-      ? Math.round((Date.now() - freeTextStartRef.current) / 1000)
+    const delayMinutes = startTimeRef.current
+      ? Math.floor((Date.now() - startTimeRef.current) / 60000)
       : 0;
+
+    // 백엔드 combinedText 로직과 보조를 맞추기 위해 origin_text 생성
+    const combinedText = `[Goal] ${todayGoal}\n[Learned] ${learned}\n[Confused] ${confused}\n[Review] ${review}\n[Memo] ${freeText || emotionOneLine}`;
 
     try {
       const response = await axios.post('/api/reflection', {
         userId: user.id,
         delayMinutes,
-        text: emotionOneLine,
-        image: emotionImage,
-        isPrivate: false,
+        origin_text: combinedText, // 물리 필드명 준수
+        image_data: studyImage || emotionImage, // 물리 필드명 준수
         emotionEmoji: selectedEmotion,
         selectedSpell: selectedSpell?.main ?? null,
-        emotionOneLine,
+        // 분석을 위한 원시 데이터 함께 전달 (백엔드 processAnalysis 대응)
         todayGoal,
-        achievement,
         learned,
         confused,
         review,
-        freeText,
-        studyImage,
+        freeText: freeText || emotionOneLine
       });
 
       if (response.data.success) {
@@ -332,341 +361,346 @@ export default function Reflection() {
       }
     } catch (error) {
       console.error('Submission failed:', error);
-      alert('회고 등록 중 오류가 발생했습니다. 서버 연결을 확인해주세요.');
+      alert('회고 등록 중 오류가 발생했습니다.');
       setIsTransitioning(false);
     }
   };
 
-  // ─── 렌더 ──────────────────────────────────────────────
+  const handleMoreSpells = () => {
+    if (showAllSpells) {
+      setShowAllSpells(false);
+      setExtraSpells([]);
+    } else {
+      const currentType = EMOTIONS.find(e => e.key === selectedEmotion)!.spellType;
+      const otherTexts = Object.entries(SPELL_DATA)
+        .filter(([type]) => type !== currentType)
+        .flatMap(([, texts]) => texts);
+      setExtraSpells(toSpells(pickRandom(otherTexts, 3), 'mixed'));
+      setShowAllSpells(true);
+    }
+  };
+
   return (
     <div
-      className="relative min-h-screen bg-[#FFF9F0]"
+      className="relative min-h-screen bg-brand-bg font-brand-kor text-brand-primary overflow-x-hidden"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* 드래그 오버레이 */}
-      {isDragging && (
-        <div className="fixed inset-0 z-50 bg-brand-primary/20 backdrop-blur-sm flex items-center justify-center border-4 border-dashed border-brand-primary m-4 rounded-[3.5rem] pointer-events-none">
-          <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center gap-4">
-            <ImageIcon size={48} className="text-brand-primary animate-bounce" />
-            <p className="text-xl font-black text-brand-primary">여기에 이미지를 놓아주세요!</p>
-          </div>
-        </div>
-      )}
+      {/* ── 배경 장식 ── */}
+      <div className="fixed inset-0 pointer-events-none">
+        <motion.div animate={{ y: [0, -20, 0], rotate: [0, 5, 0] }} transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-[15%] left-[10%] text-brand-purple/15">
+          <Heart size={120} fill="currentColor" />
+        </motion.div>
+        <motion.div animate={{ y: [0, 30, 0], rotate: [0, -10, 0] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1 }} className="absolute top-[40%] right-[8%] text-brand-mint/15">
+          <BookOpen size={160} fill="currentColor" />
+        </motion.div>
+        <motion.div animate={{ scale: [1, 1.1, 1], opacity: [0.1, 0.2, 0.1] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }} className="absolute bottom-[20%] left-[15%] text-brand-yellow/20">
+          <Star size={100} fill="currentColor" />
+        </motion.div>
+        <motion.div animate={{ x: [0, 20, 0] }} transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }} className="absolute top-[60%] left-[5%] text-brand-sky/10">
+          <Cloud size={140} fill="currentColor" />
+        </motion.div>
+      </div>
 
-      {/* 전환 오버레이 — 제출 후 2초간 표시 */}
       {isTransitioning && (
-        <div className="fixed inset-0 z-[200] bg-[#FFF9F0] flex flex-col items-center justify-center">
-          <motion.div
-            animate={{ y: [0, -22, 0] }}
-            transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-            className="mb-10 relative w-56 h-56"
-          >
+        <div className="fixed inset-0 z-[200] bg-brand-bg flex flex-col items-center justify-center">
+          <motion.div animate={{ y: [0, -25, 0] }} transition={{ duration: 1.2, repeat: Infinity }} className="mb-12 relative w-72 h-72">
             <AnimatePresence mode="wait">
-              <motion.img
-                key={charToggle ? 'pure' : 'wink'}
-                src={charToggle ? yummyPure : yummyWink}
-                alt="Yummy"
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85 }}
-                transition={{ duration: 0.2 }}
-                className="w-56 h-56 object-contain absolute inset-0"
-              />
+              <motion.img key={charToggle ? 'pure' : 'wink'} src={charToggle ? yummyPure : yummyWink} alt="Yummy" className="w-full h-full object-contain absolute inset-0" />
             </AnimatePresence>
           </motion.div>
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="text-xl font-black text-brand-primary"
-          >
-            오늘의 마음을 담고 있어요 🍬
-          </motion.p>
+          <p className="text-3xl font-black text-brand-primary">오늘의 마음을 담고 있어요 🍬</p>
         </div>
       )}
 
-      {/* 본문 */}
-      <div className="max-w-[600px] mx-auto px-4 py-6 pb-28 flex flex-col gap-5">
+      {/* ── 헤더 (가로폭 1000px로 확장) ── */}
+      <div className="max-w-[1000px] mx-auto pt-16 px-6 relative z-10">
+        <h1 className="text-4xl font-black mb-3 tracking-tight">오늘의 기록</h1>
+        <p className="text-lg text-gray-500 font-medium text-left">나의 하루를 반짝이는 캔디로 채워보세요.</p>
+      </div>
 
-        {/* ── 감정 리플렉션 카드 ── */}
-        <div>
-          <p className="text-[11px] font-black tracking-[1.5px] uppercase text-gray-400 mb-2.5">감정 리플렉션</p>
-          <div className="bg-gradient-to-br from-[#FFF9F0] to-[#FFF0FA] border border-[#FFE4B5] rounded-2xl p-5 shadow-md">
-
-            <p className="font-bold text-brand-primary mb-0.5">🎭 오늘 내 감정은?</p>
-            <p className="text-sm text-gray-500 mb-4">지금 솔직한 감정을 하나 골라봐요</p>
-
-            {/* 이모지 선택 */}
-            <div className="flex justify-between gap-2 mb-5">
-              {EMOTIONS.map((em) => (
-                <button
-                  key={em.key}
-                  onClick={() => {
-                    setSelectedEmotion(em.key);
-                    setSelectedSpell(null);
-                    setShowAllSpells(false);
-                    setExtraSpells([]);
-                    setDisplayedSpells(toSpells(pickRandom(SPELL_DATA[em.spellType], 3), em.spellType));
-                  }}
-                  className={`
-                    flex-1 flex flex-col items-center gap-1.5 py-3 px-1 rounded-2xl border-2 transition-all
-                    ${selectedEmotion === em.key
-                      ? 'border-amber-400 bg-[#FFFBEA] shadow-md -translate-y-1'
-                      : 'border-transparent bg-white/70 hover:-translate-y-1 hover:shadow-md'}
-                  `}
-                >
-                  <span className="text-3xl">{em.emoji}</span>
-                  <span className={`text-[10px] font-bold transition-all ${selectedEmotion === em.key ? 'text-amber-700 opacity-100' : 'text-gray-400 opacity-0 group-hover:opacity-100'}`}>
-                    {em.label}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* 주문 목록 */}
-            <AnimatePresence>
-              {selectedEmotion && (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-4 overflow-hidden"
-                >
-                  <p className="text-[13px] font-semibold text-gray-500 mb-2.5 flex items-center gap-1.5">
-                    ✨ 오늘 나에게 필요한 주문은?
-                  </p>
-                  <div className="flex flex-col gap-2">
-                    {[...displayedSpells, ...extraSpells].map((spell) => (
-                      <button
-                        key={spell.main}
-                        onClick={() => setSelectedSpell(spell)}
-                        className={`
-                          flex items-center gap-3 px-4 py-3.5 rounded-xl border-[1.5px] text-left transition-all
-                          ${selectedSpell?.main === spell.main
-                            ? 'border-amber-400 bg-[#FFFBEA] shadow-sm'
-                            : 'border-[#F0E6D3] bg-white/85 hover:border-amber-300 hover:bg-[#FFFEF5]'}
-                        `}
-                      >
-                        <span className="text-xl w-7 text-center flex-shrink-0">{spell.icon}</span>
-                        <span className={`text-sm font-semibold ${selectedSpell?.main === spell.main ? 'text-amber-700' : 'text-gray-800'}`}>
-                          {spell.main}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (showAllSpells) {
-                        setShowAllSpells(false);
-                        setExtraSpells([]);
-                      } else {
-                        const currentType = EMOTIONS.find(e => e.key === selectedEmotion)!.spellType;
-                        const otherTexts = Object.entries(SPELL_DATA)
-                          .filter(([type]) => type !== currentType)
-                          .flatMap(([, texts]) => texts);
-                        setExtraSpells(toSpells(pickRandom(otherTexts, Math.floor(Math.random() * 2) + 2), 'mixed'));
-                        setShowAllSpells(true);
-                      }
-                    }}
-                    className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600 transition-colors py-2"
-                  >
-                    {showAllSpells ? '· 접기' : '· 다른 주문 보기'}
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* 감정 한 줄 입력 */}
-            <div className="pt-4 border-t border-dashed border-amber-200">
-              <p className="text-[13px] font-semibold text-gray-500 mb-2 flex items-center gap-2">
-                💬 오늘의 감정을 한 줄로
-                <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">선택</span>
-              </p>
-              <div className="relative">
-                <textarea
-                  rows={3}
-                  maxLength={150}
-                  className="w-full border border-[#F0E6D3] rounded-xl px-3.5 py-3 text-sm text-gray-800 bg-white/90 resize-none outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/10 placeholder:text-gray-400 placeholder:text-[13px] leading-relaxed transition"
-                  placeholder={selectedSpell?.placeholder ?? '오늘 하루 어떤 감정이 가장 컸나요? 편하게 털어놔봐요 :)'}
-                  value={emotionOneLine}
-                  onChange={e => setEmotionOneLine(e.target.value)}
-                />
-                <span className="absolute bottom-2.5 right-3 text-[11px] text-gray-300">{emotionOneLine.length}/150</span>
-              </div>
-            </div>
-
-            {/* 사진 첨부 */}
-            <div className="mt-3 flex gap-2.5 items-start flex-wrap">
-              <input type="file" ref={emotionFileRef} accept="image/*" className="hidden"
-                onChange={e => handleImageUpload(e, setEmotionImage)} />
-              <button
-                onClick={() => emotionFileRef.current?.click()}
-                disabled={isProcessing}
-                className="flex items-center gap-1.5 px-3.5 py-2 border border-dashed border-gray-300 rounded-xl text-[13px] text-gray-500 bg-white/60 hover:border-amber-400 hover:bg-[#FFFBEA] hover:text-gray-700 transition disabled:opacity-50"
-              >
-                📷 사진 첨부
-              </button>
-              {emotionImage && (
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#F0E6D3] shadow-sm">
-                  <img src={emotionImage} alt="첨부" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => setEmotionImage(null)}
-                    className="absolute top-0.5 right-0.5 w-[18px] h-[18px] bg-black/55 text-white rounded-full flex items-center justify-center text-[11px]"
-                  >
-                    <X size={10} />
-                  </button>
-                </div>
-              )}
-              {isProcessing && (
-                <span className="flex items-center gap-1.5 text-brand-primary text-sm font-bold animate-pulse">
-                  <Sparkles size={16} /> 처리 중...
-                </span>
-              )}
-            </div>
-
+      {/* ── 메인 컨텐츠 (가로폭 1000px로 확장) ── */}
+      <div className="max-w-[1000px] mx-auto px-6 py-12 pb-40 flex flex-col gap-24 relative z-10">
+        
+        {/* ── Section 1: 오늘의 감정 ── */}
+        <section className="flex flex-col gap-8">
+          <div className="px-2 text-left">
+            <h2 className="text-2xl font-black text-brand-primary/80">오늘의 감정</h2>
+            <div className="h-1.5 w-16 bg-brand-purple/30 mt-2 rounded-full" />
           </div>
-        </div>
-
-        {/* ── 학습 내용 정리 카드 ── */}
-        <div>
-          <p className="text-[11px] font-black tracking-[1.5px] uppercase text-gray-400 mb-2.5">학습 내용 정리</p>
-          <div className="bg-gradient-to-br from-[#F0FFF4] to-[#F0F4FF] border border-[#C3FAD4] rounded-2xl p-5 shadow-md">
-
-            <p className="font-bold text-brand-primary mb-0.5">📚 오늘의 학습 기록</p>
-            <p className="text-sm text-gray-500 mb-4">오늘 배운 것들을 가볍게 정리해봐요. 한 줄씩만 써도 충분해요!</p>
-
-            {/* 어제 힌트 */}
-            {yesterdayReview && (
-              <div className="bg-white/70 border border-[#D1FAE5] rounded-xl px-4 py-3 flex gap-2.5 items-start mb-4">
-                <span className="text-base mt-0.5">💡</span>
-                <p className="text-[13px] text-gray-500 leading-relaxed">
-                  어제 나는 <strong className="text-emerald-600 font-semibold">"{yesterdayReview}"</strong>를 다짐했어요. 오늘 해결됐나요?
-                </p>
-              </div>
-            )}
-
-            {/* 오늘 목표 */}
-            <div className="mb-4">
-              <p className="text-[13px] font-semibold text-gray-500 mb-2">🎯 오늘 내가 정복하고 싶었던 것은?</p>
-              <input
-                type="text"
-                className="w-full border border-[#F0E6D3] rounded-xl px-3.5 py-2.5 text-sm text-gray-800 bg-white/90 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/10 placeholder:text-gray-400 placeholder:text-[13px] transition"
-                placeholder="예) async/await 완전히 이해하기"
-                value={todayGoal}
-                onChange={e => setTodayGoal(e.target.value)}
-              />
-            </div>
-
-            {/* 달성 여부 */}
-            <div className="mb-5">
-              <p className="text-[13px] font-semibold text-gray-500 mb-2.5">✅ 달성 여부</p>
-              <div className="grid grid-cols-2 gap-2">
-                {ACHIEVEMENTS.map((ach) => (
+          
+          <div className="bg-white/85 backdrop-blur-md rounded-[3rem] p-10 md:p-14 shadow-xl shadow-brand-purple/5 border border-brand-purple/10 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-brand-purple/5 rounded-full -mr-32 -mt-32 transition-transform duration-700 group-hover:scale-110" />
+            
+            <div className="relative">
+              <p className="text-xl font-bold text-gray-800 mb-8 text-left">지금 떠오르는 기분은 어떤가요?</p>
+              
+              <div className="flex justify-between gap-4 mb-12">
+                {EMOTIONS.map((em) => (
                   <button
-                    key={ach.key}
-                    onClick={() => setAchievement(ach.key)}
+                    key={em.key}
+                    onClick={() => {
+                      setSelectedEmotion(em.key);
+                      setSelectedSpell(null);
+                      setDisplayedSpells(toSpells(pickRandom(SPELL_DATA[em.spellType], 3), em.spellType));
+                    }}
                     className={`
-                      flex items-center gap-2.5 px-3.5 py-3 rounded-xl border-2 text-left transition-all
-                      ${achievement === ach.key ? ach.color + ' shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}
+                      flex-1 flex flex-col items-center gap-3 py-6 rounded-3xl border-2 transition-all duration-300
+                      ${selectedEmotion === em.key
+                        ? 'border-brand-purple bg-brand-purple/5 shadow-inner scale-105'
+                        : 'border-transparent bg-brand-surface/40 hover:bg-brand-purple/5'}
                     `}
                   >
-                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 text-[11px] transition-all ${achievement === ach.key ? 'border-transparent bg-current' : 'border-gray-300 bg-white'}`}>
-                      {achievement === ach.key && <span className="text-white">✓</span>}
-                    </div>
-                    <div>
-                      <p className="text-[13px] font-medium text-gray-800">{ach.emoji} {ach.main}</p>
-                      <p className="text-[11px] text-gray-400">{ach.sub}</p>
-                    </div>
+                    <motion.img 
+                      src={em.img} 
+                      alt={em.label} 
+                      className="w-16 h-16 md:w-24 md:h-24 object-contain mb-1"
+                      animate={selectedEmotion === em.key ? { scale: 1.2, rotate: [0, 5, -5, 0] } : {}}
+                    />
+                    <span className={`text-sm font-bold ${selectedEmotion === em.key ? 'text-brand-purple' : 'text-gray-400'}`}>
+                      {em.label}
+                    </span>
                   </button>
                 ))}
               </div>
-            </div>
 
-            {/* 구분선 */}
-            <div className="h-px bg-gradient-to-r from-transparent via-gray-200 to-transparent my-4" />
+              <AnimatePresence>
+                {selectedEmotion && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="mb-8"
+                  >
+                    <p className="text-base font-bold text-brand-purple mb-8 flex items-center justify-start gap-2">
+                      <Wand2 size={20} className="animate-pulse" /> 당신에게 전하는 따뜻한 주문을 외워보세요
+                    </p>
+                    <div className="grid grid-cols-1 gap-4 max-w-[600px] ml-0 px-4">
+                      {[...displayedSpells, ...extraSpells].map((spell) => (
+                        <button
+                          key={spell.main}
+                          onClick={() => {
+                            setSelectedSpell(spell);
+                            setSpellBurst(prev => prev + 1);
+                          }}
+                          className={`
+                            relative px-6 py-4 rounded-[1.5rem] border-2 text-center transition-all duration-500 group
+                            ${selectedSpell?.main === spell.main
+                              ? 'border-brand-purple bg-white text-brand-purple shadow-[0_10px_25px_rgba(167,139,250,0.2)] scale-105 z-20'
+                              : 'border-brand-purple/10 bg-brand-surface/30 text-gray-500 hover:border-brand-purple/20'}
+                          `}
+                        >
+                          <Quote size={16} className={`absolute top-3 left-4 opacity-10 ${selectedSpell?.main === spell.main ? 'text-brand-purple opacity-30' : ''}`} />
+                          <span className={`text-base font-black tracking-tight leading-relaxed ${selectedSpell?.main === spell.main ? 'text-lg' : ''}`}>
+                            {spell.main}
+                          </span>
+                          <Quote size={16} className={`absolute bottom-3 right-4 opacity-10 rotate-180 ${selectedSpell?.main === spell.main ? 'text-brand-purple opacity-30' : ''}`} />
+                          
+                          {selectedSpell?.main === spell.main && (
+                            <>
+                              <MagicParticle key={spellBurst} containerWidth={150} />
+                              <motion.div 
+                                layoutId="shimmer"
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-brand-purple/5 to-transparent rounded-[1.5rem]"
+                                animate={{ x: ['-100%', '100%'] }}
+                                transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+                              />
+                            </>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <button
+                      onClick={handleMoreSpells}
+                      className="w-full mt-6 flex items-center justify-start gap-2 text-sm font-bold text-brand-purple/60 hover:text-brand-purple transition-colors py-2 px-4"
+                    >
+                      <RefreshCw size={14} className={showAllSpells ? 'rotate-180 transition-transform' : ''} />
+                      {showAllSpells ? '주문 접기' : '다른 감정의 주문 소환하기'}
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            {/* 학습 3칸 */}
-            <div className="flex flex-col gap-3.5 mb-4">
-              {[
-                { label: '💡 오늘 새로 알게 된 것', placeholder: '예) Promise는 비동기 작업의 결과를 나타내는 객체다', value: learned, setter: setLearned },
-                { label: '🤯 아직 잘 모르겠는 것', placeholder: '예) async/await랑 Promise 차이가 아직 헷갈림', value: confused, setter: setConfused },
-                { label: '⭐ 내일 꼭 복습할 것',    placeholder: '예) 콜백 지옥 해결 방법',                     value: review,   setter: setReview   },
-              ].map((field) => (
-                <div key={field.label}>
-                  <p className="text-[13px] font-semibold text-gray-500 mb-1.5">{field.label}</p>
-                  <input
-                    type="text"
-                    className="w-full border border-[#F0E6D3] rounded-xl px-3.5 py-2.5 text-sm text-gray-800 bg-white/90 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/10 placeholder:text-gray-400 placeholder:text-[12.5px] transition"
-                    placeholder={field.placeholder}
-                    value={field.value}
-                    onChange={e => field.setter(e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {/* 자유 입력 (2000자) */}
-            <div className="mb-4">
-              <p className="text-[13px] font-semibold text-gray-500 mb-1.5 flex items-center gap-2">
-                📝 추가로 기록하고 싶은 것
-                <span className="text-[10px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">선택</span>
-              </p>
-              <div className="relative">
+              <div className="pt-8 border-t border-brand-gray/30 text-left">
+                <p className="text-base font-bold text-gray-500 mb-4 ml-1 flex items-center gap-2">
+                  <MessageSquare size={18} /> 조금 더 자세히 들려주세요
+                </p>
                 <textarea
-                  rows={6}
-                  maxLength={2000}
-                  className="w-full border border-[#F0E6D3] rounded-xl px-3.5 py-3 text-sm text-gray-800 bg-white/90 resize-none outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/10 placeholder:text-gray-400 placeholder:text-[13px] leading-relaxed transition"
-                  placeholder="오늘 수업에서 더 기록해두고 싶은 내용이 있으면 자유롭게 적어봐요"
-                  value={freeText}
-                  onChange={e => {
-                    if (!freeTextStartRef.current) freeTextStartRef.current = Date.now();
-                    setFreeText(e.target.value);
-                  }}
+                  rows={5}
+                  className="w-full bg-brand-surface/40 rounded-3xl p-6 text-lg text-gray-800 outline-none focus:ring-4 focus:ring-brand-purple/10 transition-all resize-none placeholder:text-gray-300 leading-relaxed"
+                  placeholder={selectedSpell?.placeholder ?? '오늘의 감정을 자유롭게 적어보세요.'}
+                  value={emotionOneLine}
+                  onChange={e => setEmotionOneLine(e.target.value)}
                 />
-                <span className="absolute bottom-2.5 right-3 text-[11px] text-gray-300">{freeText.length}/2000</span>
+              </div>
+
+              <div className="mt-6 flex items-center justify-start gap-4">
+                <button
+                  onClick={() => emotionFileRef.current?.click()}
+                  className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl border-2 border-dashed border-gray-300 text-sm font-bold text-gray-500 hover:bg-brand-surface/60 transition-all"
+                >
+                  <ImageIcon size={18} /> 감정 사진 추가
+                </button>
+                <input type="file" ref={emotionFileRef} className="hidden" accept="image/*" onChange={e => handleImageUpload(e, setEmotionImage)} />
+                {emotionImage && (
+                  <div className="relative w-16 h-16 rounded-2xl overflow-hidden ring-2 ring-brand-purple/20">
+                    <img src={emotionImage} className="w-full h-full object-cover" />
+                    <button onClick={() => setEmotionImage(null)} className="absolute top-0 right-0 bg-black/60 text-white p-1 rounded-bl-xl"><X size={12} /></button>
+                  </div>
+                )}
               </div>
             </div>
+          </div>
+        </section>
 
-            {/* 학습 자료 이미지 */}
-            <div className="flex gap-2.5 items-start flex-wrap">
-              <input type="file" ref={studyFileRef} accept="image/*" className="hidden"
-                onChange={e => handleImageUpload(e, setStudyImage)} />
-              <button
-                onClick={() => studyFileRef.current?.click()}
-                disabled={isProcessing}
-                className="flex items-center gap-1.5 px-3.5 py-2 border border-dashed border-gray-300 rounded-xl text-[13px] text-gray-500 bg-white/60 hover:border-emerald-400 hover:bg-emerald-50 hover:text-gray-700 transition disabled:opacity-50"
-              >
-                📸 학습 자료 첨부
-              </button>
-              {studyImage && (
-                <div className="relative w-16 h-16 rounded-xl overflow-hidden border border-[#F0E6D3] shadow-sm">
-                  <img src={studyImage} alt="학습자료" className="w-full h-full object-cover" />
-                  <button
-                    onClick={() => setStudyImage(null)}
-                    className="absolute top-0.5 right-0.5 w-[18px] h-[18px] bg-black/55 text-white rounded-full flex items-center justify-center"
-                  >
-                    <X size={10} />
-                  </button>
+        {/* ── Section 2: 학습 내용 정리 ── */}
+        <section className="flex flex-col gap-8">
+          <div className="px-2 text-left">
+            <h2 className="text-2xl font-black text-brand-primary/80">학습 내용 정리</h2>
+            <div className="h-1.5 w-16 bg-brand-mint/30 mt-2 rounded-full" />
+          </div>
+
+          <div className="bg-white/85 backdrop-blur-md rounded-[3rem] p-10 md:p-14 shadow-xl shadow-brand-mint/5 border border-brand-mint/10 relative overflow-hidden group">
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-brand-mint/5 rounded-full -ml-32 -mb-32 transition-transform duration-700 group-hover:scale-110" />
+            
+            <div className="relative">
+              {yesterdayReview && (
+                <div className="bg-brand-mint/5 border border-brand-mint/20 rounded-[2rem] p-6 mb-10 flex gap-4 items-start shadow-inner">
+                  <p className="text-lg text-gray-600 leading-relaxed text-left">
+                    <Sparkles size={22} className="text-brand-mint inline-block mr-2" />
+                    어제의 다짐을 기억하시나요? <br />
+                    <span className="font-black text-brand-primary/80 text-xl ml-8">"{yesterdayReview}"</span>
+                  </p>
                 </div>
               )}
-            </div>
 
+              <div className="mb-12 text-left">
+                <p className="text-base font-bold text-gray-500 mb-4 ml-1 flex items-center gap-2">
+                  <Target size={18} /> 오늘 꼭 해내고 싶었던 목표
+                </p>
+                <input
+                  type="text"
+                  className="w-full bg-brand-surface/40 rounded-2xl px-7 py-5 text-lg text-gray-800 outline-none focus:ring-4 focus:ring-brand-mint/10 transition-all font-medium"
+                  placeholder="예) 알고리즘 2문제 풀기"
+                  value={todayGoal}
+                  onChange={e => { recordStartTime(); setTodayGoal(e.target.value); }}
+                />
+              </div>
+
+              <div className="mb-12 text-left">
+                <p className="text-base font-bold text-gray-500 mb-4 ml-1">오늘의 성취도</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {Object.entries(ACHIEVEMENTS).map(([key, data]) => (
+                    <button
+                      key={key}
+                      onClick={() => setAchievement(key as AchievementKey)}
+                      className={`
+                        flex flex-col items-center gap-3 px-4 py-6 rounded-2xl border-2 transition-all duration-300
+                        ${achievement === key ? data.activeColor : data.color + ' hover:border-brand-gray/50'}
+                      `}
+                    >
+                      <span className={achievement === key ? 'text-inherit' : 'text-gray-300'}>{data.icon}</span>
+                      <div className="text-center">
+                        <p className="text-base font-black">{data.main}</p>
+                        <p className="text-[10px] opacity-60 font-medium">{data.sub}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-8 mb-12 text-left">
+                <div className="group/item">
+                  <p className="text-base font-black text-brand-mint mb-3 ml-2 flex items-center gap-2.5">
+                    <Zap size={22} fill="currentColor" className="text-brand-yellow group-hover/item:rotate-12 transition-transform" /> 
+                    오늘의 번뜩이는 발견
+                  </p>
+                  <input
+                    type="text"
+                    className="w-full bg-brand-surface/40 rounded-2xl px-7 py-5 text-lg text-gray-800 outline-none focus:ring-2 focus:ring-brand-mint/30 transition-all shadow-sm"
+                    placeholder="새롭게 깨달은 사실이 있다면?"
+                    value={learned}
+                    onChange={e => { recordStartTime(); setLearned(e.target.value); }}
+                  />
+                </div>
+                
+                <div className="group/item">
+                  <p className="text-base font-black text-brand-sky mb-3 ml-2 flex items-center gap-2.5">
+                    <Compass size={22} className="group-hover/item:rotate-90 transition-transform duration-500" /> 
+                    더 다듬어야 할 부분
+                  </p>
+                  <input
+                    type="text"
+                    className="w-full bg-brand-surface/40 rounded-2xl px-7 py-5 text-lg text-gray-800 outline-none focus:ring-2 focus:ring-brand-sky/30 transition-all shadow-sm"
+                    placeholder="아직은 알쏭달쏭한 것이 있나요?"
+                    value={confused}
+                    onChange={e => { recordStartTime(); setConfused(e.target.value); }}
+                  />
+                </div>
+
+                <div className="group/item">
+                  <p className="text-base font-black text-brand-coral mb-3 ml-2 flex items-center gap-2.5">
+                    <Rocket size={22} className="group-hover/item:-translate-y-1 group-hover/item:translate-x-1 transition-transform" /> 
+                    내일의 도약을 위한 미션
+                  </p>
+                  <input
+                    type="text"
+                    className="w-full bg-brand-surface/40 rounded-2xl px-7 py-5 text-lg text-gray-800 outline-none focus:ring-2 focus:ring-brand-coral/30 transition-all shadow-sm"
+                    placeholder="내일의 나에게 미션을 남겨보세요."
+                    value={review}
+                    onChange={e => { recordStartTime(); setReview(e.target.value); }}
+                  />
+                </div>
+              </div>
+
+              <div className="text-left">
+                <p className="text-base font-bold text-gray-500 mb-4 ml-1">상세 내용 (메모)</p>
+                <textarea
+                  rows={10}
+                  className="w-full bg-brand-surface/40 rounded-3xl p-6 text-base text-gray-800 outline-none focus:ring-4 focus:ring-brand-mint/10 transition-all resize-none leading-relaxed"
+                  placeholder="공부한 내용이나 떠오른 아이디어를 자유롭게 적어보세요."
+                  value={freeText}
+                  onChange={e => { recordStartTime(); setFreeText(e.target.value); }}
+                />
+              </div>
+
+              <div className="mt-6 flex items-center justify-start gap-4">
+                <button
+                  onClick={() => studyFileRef.current?.click()}
+                  className="flex items-center gap-2.5 px-6 py-3.5 rounded-2xl border-2 border-dashed border-gray-300 text-sm font-bold text-gray-500 hover:bg-brand-surface/60 transition-all"
+                >
+                  <ImageIcon size={18} /> 학습 자료 첨부
+                </button>
+                <input type="file" ref={studyFileRef} className="hidden" accept="image/*" onChange={e => handleImageUpload(e, setStudyImage)} />
+                {studyImage && (
+                  <div className="relative w-16 h-16 rounded-2xl overflow-hidden ring-2 ring-brand-mint/20">
+                    <img src={studyImage} className="w-full h-full object-cover" />
+                    <button onClick={() => setStudyImage(null)} className="absolute top-0 right-0 bg-black/60 text-white p-1 rounded-bl-xl"><X size={12} /></button>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
 
       </div>
 
-      {/* ── 하단 fixed 버튼 ── */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#FFF9F0]/95 backdrop-blur border-t border-[#F0E6D3] px-4 py-3.5 z-[200]">
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit}
-          className="w-full max-w-[600px] mx-auto flex items-center justify-center gap-2.5 py-4 bg-gradient-to-r from-amber-400 to-orange-400 text-amber-900 font-bold text-base rounded-2xl shadow-lg hover:-translate-y-0.5 hover:shadow-xl active:translate-y-0 transition-all disabled:opacity-40 disabled:cursor-not-allowed disabled:translate-y-0"
-        >
-          🍬 오늘의 캔디 채우기
-        </button>
+      {/* ── 하단 플로팅 바 (가로폭 1000px로 확장) ── */}
+      <div className="fixed bottom-0 left-0 right-0 bg-brand-bg/90 backdrop-blur-xl border-t border-brand-gray/30 py-6 px-10 z-[150]">
+        <div className="max-w-[1000px] mx-auto flex items-center justify-between">
+          <div className="hidden md:block">
+            <p className="text-sm font-bold text-brand-primary/60 text-left">오늘의 모든 기록이 당신을 빛나게 할 거예요.</p>
+          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit}
+            className="group flex items-center gap-4 px-16 py-5 bg-brand-primary text-brand-surface rounded-[2rem] font-black text-xl shadow-2xl shadow-brand-primary/30 hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale disabled:scale-100"
+          >
+            기록 완료하기
+            <CheckCircle2 size={24} className="group-hover:rotate-12 transition-transform" />
+          </button>
+        </div>
       </div>
 
     </div>
