@@ -1,12 +1,12 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Star, Sparkles, Quote, History, BrainCircuit, Package, Gamepad2, BookOpen, Heart, ChevronRight, RefreshCw, Pencil, Check, X, Calendar } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { Star, Sparkles, Quote, History, BrainCircuit, Package, Gamepad2, BookOpen, Heart, ChevronRight, RefreshCw, Pencil, Check, X, Calendar, Flame, TrendingUp } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import axios from 'axios';
 
 export default function Jar() {
-  const { user, emotions = [], collection = [], fetchHistory, fetchMe, fetchCollection, drawItem, toggleEquip } = useStore();
+  const { user, emotions = [], collection = [], streakDays, fetchHistory, fetchMe, fetchCollection, drawItem, toggleEquip } = useStore();
 
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'edu' | 'emo'>('edu');
@@ -26,6 +26,12 @@ export default function Jar() {
   // 수정 팝업 상태
   const [editingItem, setEditingItem] = useState<any>(null);
   const [editText, setEditText] = useState('');
+
+  // 감정 차트 모드
+  const [chartMode, setChartMode] = useState<'week' | 'month'>('week');
+
+  // 감정 달력 선택 날짜
+  const [calendarDay, setCalendarDay] = useState<number | null>(null);
 
   // 히스토리 달력 필터
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -179,8 +185,12 @@ export default function Jar() {
       const analysis = item.Analysis;
       const day = new Date(item.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
       const entry: any = { day };
+      // 5개 감정 합 기준 100% 정규화
+      const total = analysis
+        ? top5EmotionKeys.reduce((sum, { key }) => sum + (analysis[key] || 0), 0)
+        : 0;
       top5EmotionKeys.forEach(({ key, label }) => {
-        entry[label] = analysis ? Math.round((analysis[key] || 0) * 100) : 0;
+        entry[label] = (analysis && total > 0) ? Math.round(((analysis[key] || 0) / total) * 100) : 0;
       });
       return entry;
     });
@@ -202,9 +212,186 @@ export default function Jar() {
     const avgs = Object.entries(sums).map(([label, sum]) => ({ label, avg: sum / count }));
     avgs.sort((a, b) => b.avg - a.avg);
     const top = avgs[0];
-    const positive = ((sums['행복'] || 0) + (sums['성취'] || 0) + (sums['안도'] || 0) + (sums['감사'] || 0) + (sums['자부심'] || 0)) / count;
-    const negative = ((sums['슬픔'] || 0) + (sums['불안'] || 0) + (sums['우울'] || 0) + (sums['좌절'] || 0)) / count;
+    // 전체 감정 합 대비 긍정/부정 비율로 계산 (100% 초과 방지)
+    const totalSum = Object.values(sums).reduce((s, v) => s + v, 0);
+    const positiveSum = (sums['행복'] || 0) + (sums['성취'] || 0) + (sums['안도'] || 0) + (sums['감사'] || 0) + (sums['자부심'] || 0);
+    const negativeSum = (sums['슬픔'] || 0) + (sums['불안'] || 0) + (sums['우울'] || 0) + (sums['좌절'] || 0);
+    const positive = totalSum > 0 ? positiveSum / totalSum : 0;
+    const negative = totalSum > 0 ? negativeSum / totalSum : 0;
     return { top, positive, negative, avgs };
+  }, [emotions]);
+
+  // 월별 차트 데이터: 이번 달 1~5주차 × 상위 5개 감정 평균 (선그래프용)
+  const monthChartData = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+
+    // 이번 달 데이터만 필터
+    const thisMonthItems = emotions.filter((item: any) => {
+      const d = new Date(item.createdAt);
+      return d.getFullYear() === year && d.getMonth() === month;
+    });
+
+    // 주차 계산: 1일 기준 ceil(day / 7)
+    const getWeek = (dateStr: string) => Math.ceil(new Date(dateStr).getDate() / 7);
+
+    // 주차별 감정 합산
+    const weekSums: Record<number, Record<string, number>> = {};
+    const weekCounts: Record<number, number> = {};
+    thisMonthItems.forEach((item: any) => {
+      const a = item.Analysis;
+      if (!a) return;
+      const w = getWeek(item.createdAt);
+      if (!weekSums[w]) { weekSums[w] = {}; weekCounts[w] = 0; }
+      weekCounts[w]++;
+      top5EmotionKeys.forEach(({ key, label }) => {
+        weekSums[w][label] = (weekSums[w][label] || 0) + (a[key] || 0);
+      });
+    });
+
+    // 최대 주차 결정 (이번 달 마지막 날 기준)
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const maxWeek = Math.ceil(lastDay / 7);
+
+    return Array.from({ length: maxWeek }, (_, i) => {
+      const w = i + 1;
+      const entry: any = { week: `${w}주차` };
+      const cnt = weekCounts[w] || 0;
+      // 5개 감정 평균 합 기준 100% 정규화
+      const weekTotal = cnt > 0
+        ? top5EmotionKeys.reduce((sum, { label }) => sum + (weekSums[w]?.[label] || 0), 0) / cnt
+        : 0;
+      top5EmotionKeys.forEach(({ label }) => {
+        const avg = cnt > 0 ? (weekSums[w]?.[label] || 0) / cnt : 0;
+        entry[label] = weekTotal > 0 ? Math.round((avg / weekTotal) * 100) : 0;
+      });
+      return entry;
+    });
+  }, [emotions, top5EmotionKeys]);
+
+  // 5가지 추가 인사이트
+  const insightExtras = useMemo(() => {
+    if (emotions.length === 0) return null;
+
+    const POSITIVE_KEYS = ['happyProb', 'fulfillProb', 'reliefProb', 'gratitudeProb', 'proudProb'] as const;
+    const NEGATIVE_KEYS = ['stressProb', 'anxiousProb', 'sadProb', 'defeatProb', 'depressedProb', 'exhaustedProb', 'embarrassedProb', 'boredProb'] as const;
+    const KEY_TO_LABEL: Record<string, string> = {
+      stressProb: '스트레스', anxiousProb: '불안', sadProb: '슬픔',
+      defeatProb: '좌절', depressedProb: '우울', exhaustedProb: '지침',
+      embarrassedProb: '당황', boredProb: '지루함',
+    };
+    const DOW_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
+
+    // 2. 요일별 감정 패턴
+    const dowSums: Record<number, Record<string, number>> = {};
+    const dowCounts: Record<number, number> = {};
+    emotions.forEach((item: any) => {
+      const a = item.Analysis;
+      if (!a) return;
+      const dow = new Date(item.createdAt).getDay();
+      if (!dowSums[dow]) { dowSums[dow] = {}; dowCounts[dow] = 0; }
+      dowCounts[dow]++;
+      NEGATIVE_KEYS.forEach(k => {
+        dowSums[dow][k] = (dowSums[dow][k] || 0) + (a[k] || 0);
+      });
+    });
+    let worstDow = -1, worstVal = -1, worstLabel = '스트레스';
+    Object.entries(dowSums).forEach(([dowStr, sums]) => {
+      const dow = Number(dowStr);
+      const cnt = dowCounts[dow];
+      NEGATIVE_KEYS.forEach(k => {
+        const avg = (sums[k] || 0) / cnt;
+        if (avg > worstVal) { worstVal = avg; worstDow = dow; worstLabel = KEY_TO_LABEL[k]; }
+      });
+    });
+    const dowPattern = worstDow >= 0 ? `${DOW_LABELS[worstDow]}요일에 ${worstLabel}가 가장 높아요!` : null;
+
+    // 3. 긍정지수 변화 추이
+    const trendData = [...emotions].reverse().map((item: any) => {
+      const a = item.Analysis;
+      const day = new Date(item.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+      const pos = a
+        ? Math.round(POSITIVE_KEYS.reduce((s, k) => s + (a[k] || 0), 0) / POSITIVE_KEYS.length * 100)
+        : 0;
+      return { day, 긍정지수: pos };
+    });
+
+    // 4. 자주 쓴 키워드 — 학습 관련 필드(EDU_confused, EDU_goal)에서만 추출
+    const stopWords = new Set([
+      // 조사
+      '이', '가', '은', '는', '을', '를', '의', '에', '와', '과', '도', '로', '으로', '에서', '에게', '한테', '부터', '까지', '만', '랑', '이랑',
+      // 대명사
+      '나', '나는', '내가', '내', '저', '저는', '제가', '우리', '나를', '저를',
+      // 시간·빈도 부사
+      '오늘', '내일', '어제', '이번', '다음', '지금', '아까', '방금', '아직', '벌써', '이미', '다시', '또', '계속', '항상', '매일', '보통', '가끔', '자주', '별로', '전혀', '조금', '특히', '주로',
+      // 정도 부사
+      '너무', '정말', '그냥', '좀', '많이', '어떻게', '왜', '빨리', '천천히', '확실히', '잘', '더', '안', '못',
+      // 접속사·감탄사
+      '그리고', '그런데', '하지만', '그래서', '근데', '아', '어', '음', '뭔가', '왠지',
+      // 지시어
+      '그게', '이게', '저게', '여기', '거기', '이렇게', '저렇게', '그렇게',
+      // 의존명사
+      '것', '수', '때', '점', '부분', '내용', '경우', '곳', '쪽',
+    ]);
+    const wordMap: Record<string, number> = {};
+    emotions.forEach((item: any) => {
+      // 학습 관련 필드만 사용 (어려운 내용 + 학습 목표)
+      const texts = [item.EDU_confused, item.EDU_goal].filter(Boolean).join(' ');
+      texts.split(/\s+/).forEach(word => {
+        const clean = word.replace(/[^가-힣a-zA-Z]/g, '');
+        if (clean.length < 2) return;
+        if (stopWords.has(clean)) return;
+
+        // 영문 단어: 의미없는 반복 문자열 제외 (aa, bb, aabb 등)
+        const isEnglish = /^[a-zA-Z]+$/.test(clean);
+        if (isEnglish) {
+          if (clean.length < 3) return;                    // 2글자 이하 영문 제외
+          if (/^(.)\1+$/.test(clean)) return;              // aaa, bbb 등 단일 문자 반복
+          if (/^([a-zA-Z])\1{1,}([a-zA-Z])\2{1,}$/.test(clean)) return; // aabb, ccdd 등
+        }
+
+        // 한국어: 동사·형용사 어미 패턴 제외
+        const isVerb =
+          /다$/.test(clean) ||
+          /[어아][요서]$/.test(clean) ||
+          /[었겠]$/.test(clean) ||
+          /[네지죠]$/.test(clean) ||
+          /[고며]$/.test(clean) ||
+          /니까$/.test(clean) ||
+          /[도만]$/.test(clean) ||
+          /한데$/.test(clean) ||
+          /[같한운]$/.test(clean) ||
+          /[던]$/.test(clean);
+        if (isVerb) return;
+
+        wordMap[clean] = (wordMap[clean] || 0) + 1;
+      });
+    });
+    const keywords = Object.entries(wordMap).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([w]) => w);
+
+    // 5. 감정 히트맵 달력
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const firstDow = new Date(year, month, 1).getDay();
+    const dateColorMap: Record<string, string> = {};
+    emotions.forEach((item: any) => {
+      const d = new Date(item.createdAt);
+      if (d.getFullYear() !== year || d.getMonth() !== month) return;
+      const key = d.getDate().toString();
+      if (dateColorMap[key]) return;
+      const a = item.Analysis;
+      if (!a) { dateColorMap[key] = 'rgba(255,255,255,0.08)'; return; }
+      const posScore = POSITIVE_KEYS.reduce((s, k) => s + (a[k] || 0), 0);
+      const negScore = NEGATIVE_KEYS.reduce((s, k) => s + (a[k] || 0), 0);
+      if (posScore > negScore) dateColorMap[key] = '#4FD1A5';
+      else if (negScore > posScore * 1.2) dateColorMap[key] = '#F87171';
+      else dateColorMap[key] = '#FCD34D';
+    });
+
+    return { dowPattern, trendData, keywords, dateColorMap, firstDow, lastDay, month };
   }, [emotions]);
 
   // 최신 GPT 요약
@@ -504,37 +691,98 @@ export default function Jar() {
               <Heart size={14} /> 감정 내용
             </h2>
 
-            {/* 감정 스택바 차트 */}
+            {/* 감정 차트 */}
             <div className="bg-white border-2 border-brand-surface rounded-3xl p-8 shadow-md">
+              {/* 모드 버튼 */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => setChartMode('week')}
+                  className={`px-3 py-1 rounded-full text-[11px] font-black transition-all ${
+                    chartMode === 'week'
+                      ? 'bg-brand-primary text-white shadow-sm'
+                      : 'bg-brand-surface/50 text-brand-primary/50 hover:bg-brand-surface'
+                  }`}
+                >
+                  주별 차트
+                </button>
+                <button
+                  onClick={() => setChartMode('month')}
+                  className={`px-3 py-1 rounded-full text-[11px] font-black transition-all ${
+                    chartMode === 'month'
+                      ? 'bg-brand-primary text-white shadow-sm'
+                      : 'bg-brand-surface/50 text-brand-primary/50 hover:bg-brand-surface'
+                  }`}
+                >
+                  월별 차트
+                </button>
+              </div>
+
+              {/* 헤더 */}
               <div className="flex items-center gap-2 mb-6">
                 <div className="w-8 h-8 bg-brand-pink/20 rounded-xl flex items-center justify-center">
                   <ChevronRight size={16} className="text-brand-pink" />
                 </div>
                 <h3 className="text-base font-black text-brand-primary">감정 분포 차트</h3>
-                <span className="text-[10px] text-brand-primary/30 font-bold ml-1">최근 5회 회고 기준</span>
+                <span className="text-[10px] text-brand-primary/30 font-bold ml-1">
+                  {chartMode === 'week' ? '최근 5회 회고 기준' : `${new Date().getMonth() + 1}월 주차별 평균`}
+                </span>
               </div>
-              {chartData.length > 0 ? (
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                    <XAxis dataKey="day" tick={{ fontSize: 11, fontWeight: 700, fill: '#2D5A3D99' }} />
-                    <YAxis tick={{ fontSize: 10, fill: '#2D5A3D66' }} unit="%" />
-                    <Tooltip formatter={(v: any) => `${v}%`} contentStyle={{ borderRadius: 12, fontSize: 12, border: '1px solid #E5E7EB' }} />
-                    <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
-                    {top5EmotionKeys.map(({ label, color }, idx) => (
-                      <Bar
-                        key={label}
-                        dataKey={label}
-                        stackId="a"
-                        fill={color}
-                        radius={idx === top5EmotionKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                      />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-[260px] flex items-center justify-center text-brand-primary/30 text-sm font-medium">
-                  회고를 작성하면 감정 분포 차트가 여기에 표시됩니다.
-                </div>
+
+              {/* 주별 차트 — 스택 바 */}
+              {chartMode === 'week' && (
+                chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart data={chartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <XAxis dataKey="day" tick={{ fontSize: 11, fontWeight: 700, fill: '#2D5A3D99' }} />
+                      <YAxis tick={{ fontSize: 10, fill: '#2D5A3D66' }} unit="%" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} />
+                      <Tooltip formatter={(v: any) => `${v}%`} contentStyle={{ borderRadius: 12, fontSize: 12, border: '1px solid #E5E7EB' }} />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
+                      {top5EmotionKeys.map(({ label, color }, idx) => (
+                        <Bar
+                          key={label}
+                          dataKey={label}
+                          stackId="a"
+                          fill={color}
+                          radius={idx === top5EmotionKeys.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                        />
+                      ))}
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[260px] flex items-center justify-center text-brand-primary/30 text-sm font-medium">
+                    회고를 작성하면 감정 분포 차트가 여기에 표시됩니다.
+                  </div>
+                )
+              )}
+
+              {/* 월별 차트 — 선 그래프 */}
+              {chartMode === 'month' && (
+                monthChartData.some(d => top5EmotionKeys.some(({ label }) => d[label] > 0)) ? (
+                  <ResponsiveContainer width="100%" height={260}>
+                    <LineChart data={monthChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                      <XAxis dataKey="week" tick={{ fontSize: 11, fontWeight: 700, fill: '#2D5A3D99' }} />
+                      <YAxis tick={{ fontSize: 10, fill: '#2D5A3D66' }} unit="%" domain={[0, 100]} ticks={[0, 25, 50, 75, 100]} />
+                      <Tooltip formatter={(v: any) => `${v}%`} contentStyle={{ borderRadius: 12, fontSize: 12, border: '1px solid #E5E7EB' }} />
+                      <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11, fontWeight: 700 }} />
+                      {top5EmotionKeys.map(({ label, color }) => (
+                        <Line
+                          key={label}
+                          type="monotone"
+                          dataKey={label}
+                          stroke={color}
+                          strokeWidth={2}
+                          dot={{ r: 4, fill: color, strokeWidth: 0 }}
+                          activeDot={{ r: 6 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[260px] flex items-center justify-center text-brand-primary/30 text-sm font-medium">
+                    이번 달 회고 데이터가 없어요.
+                  </div>
+                )
               )}
             </div>
 
@@ -549,13 +797,35 @@ export default function Jar() {
                   <h3 className="text-base font-black">나의 감정 인사이트</h3>
                   <span className="text-[10px] text-white/40 font-bold ml-1">누적 데이터 기반</span>
                 </div>
+
                 {emotionInsight ? (
                   <div className="space-y-4">
+
+                    {/* 연속기록 스트릭 + 요일별 패턴 */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="bg-white/10 rounded-2xl p-4 flex items-center gap-3">
+                        <Flame size={22} className="text-brand-yellow shrink-0" />
+                        <div>
+                          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-0.5">연속 기록</p>
+                          <p className="text-xl font-black text-brand-yellow">{streakDays}일 연속!</p>
+                        </div>
+                      </div>
+                      <div className="bg-white/10 rounded-2xl p-4">
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2">요일별 패턴</p>
+                        <p className="text-xs font-black text-white leading-snug">
+                          {insightExtras?.dowPattern ?? '데이터 분석 중...'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 가장 많이 느낀 감정 */}
                     <div className="bg-white/10 rounded-2xl p-4">
                       <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">가장 많이 느낀 감정</p>
                       <p className="text-2xl font-black text-brand-yellow">{emotionInsight.top.label}</p>
                       <p className="text-xs text-white/60 mt-0.5">평균 {Math.round(emotionInsight.top.avg * 100)}% 확률로 감지됨</p>
                     </div>
+
+                    {/* 긍정 / 부정 지수 */}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-white/10 rounded-2xl p-4">
                         <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">긍정 지수</p>
@@ -566,6 +836,192 @@ export default function Jar() {
                         <p className="text-xl font-black text-brand-pink">{Math.round(emotionInsight.negative * 100)}%</p>
                       </div>
                     </div>
+
+                    {/* 감정변화추이 꺾은선 */}
+                    {insightExtras && insightExtras.trendData.length > 1 && (
+                      <div className="bg-white/10 rounded-2xl p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                          <TrendingUp size={13} className="text-brand-mint" />
+                          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">긍정지수 변화 추이</p>
+                        </div>
+                        <ResponsiveContainer width="100%" height={110}>
+                          <LineChart data={insightExtras.trendData} margin={{ top: 4, right: 8, left: -30, bottom: 0 }}>
+                            <XAxis dataKey="day" tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} />
+                            <YAxis tick={{ fontSize: 9, fill: 'rgba(255,255,255,0.4)' }} unit="%" domain={[0, 100]} />
+                            <Tooltip
+                              formatter={(v: any) => [`${v}%`, '긍정지수']}
+                              contentStyle={{ borderRadius: 8, fontSize: 11, background: '#1E4D3A', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+                            />
+                            <Line type="monotone" dataKey="긍정지수" stroke="#4FD1A5" strokeWidth={2}
+                              dot={{ r: 3, fill: '#4FD1A5', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* 자주 쓴 키워드 */}
+                    {insightExtras && insightExtras.keywords.length > 0 && (
+                      <div className="bg-white/10 rounded-2xl p-4">
+                        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">자주 쓴 키워드</p>
+                        <div className="flex flex-wrap gap-2">
+                          {insightExtras.keywords.map((word, i) => (
+                            <span key={i} className="px-3 py-1.5 bg-white/15 rounded-full text-xs font-black text-white">
+                              #{word}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 감정 히트맵 달력 */}
+                    {insightExtras && (() => {
+                      const now = new Date();
+                      const selectedReflection = calendarDay !== null
+                        ? emotions.find((item: any) => {
+                            const d = new Date(item.createdAt);
+                            return d.getFullYear() === now.getFullYear()
+                              && d.getMonth() === insightExtras.month
+                              && d.getDate() === calendarDay;
+                          })
+                        : null;
+                      return (
+                        <div className="bg-white/10 rounded-2xl p-4">
+                          <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">
+                            {insightExtras.month + 1}월 감정 달력
+                            <span className="normal-case font-medium ml-1 text-white/20">(날짜 클릭 시 회고 확인)</span>
+                          </p>
+                          <div className="grid grid-cols-7 gap-1 text-center">
+                            {['일','월','화','수','목','금','토'].map(d => (
+                              <div key={d} className="text-[9px] font-black text-white/30 pb-1">{d}</div>
+                            ))}
+                            {Array.from({ length: insightExtras.firstDow }).map((_, i) => (
+                              <div key={`e-${i}`} />
+                            ))}
+                            {Array.from({ length: insightExtras.lastDay }, (_, i) => {
+                              const day = i + 1;
+                              const color = insightExtras.dateColorMap[day.toString()];
+                              const isToday = now.getDate() === day;
+                              const isSelected = calendarDay === day;
+                              const hasData = !!color;
+                              return (
+                                <div
+                                  key={day}
+                                  onClick={() => setCalendarDay(isSelected ? null : day)}
+                                  className="aspect-square rounded-md flex items-center justify-center text-[9px] font-black transition-all"
+                                  style={{
+                                    background: color || 'rgba(255,255,255,0.05)',
+                                    color: color ? '#1E4D3A' : 'rgba(255,255,255,0.2)',
+                                    boxShadow: isSelected
+                                      ? '0 0 0 2px #fff'
+                                      : isToday
+                                      ? '0 0 0 2px #FAC775'
+                                      : 'none',
+                                    cursor: hasData ? 'pointer' : 'default',
+                                    opacity: calendarDay !== null && !isSelected ? 0.5 : 1,
+                                  }}
+                                >
+                                  {day}
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="flex items-center gap-4 mt-3">
+                            {[['#4FD1A5','긍정'],['#FCD34D','중립'],['#F87171','부정']].map(([c, label]) => (
+                              <div key={label} className="flex items-center gap-1.5">
+                                <div className="w-3 h-3 rounded-sm" style={{ background: c }} />
+                                <span className="text-[9px] text-white/40 font-bold">{label}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* 선택 날짜 회고 미리보기 */}
+                          <AnimatePresence>
+                            {calendarDay !== null && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0, marginTop: 0 }}
+                                animate={{ opacity: 1, height: 'auto', marginTop: 12 }}
+                                exit={{ opacity: 0, height: 0, marginTop: 0 }}
+                                transition={{ duration: 0.25 }}
+                                className="overflow-hidden"
+                              >
+                                <div className="bg-white/10 rounded-xl p-4 space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[11px] font-black text-white/60">
+                                      {insightExtras.month + 1}월 {calendarDay}일 회고
+                                    </p>
+                                    <button
+                                      onClick={() => setCalendarDay(null)}
+                                      className="text-white/30 hover:text-white/70 transition-colors"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  </div>
+                                  {selectedReflection ? (
+                                    <div className="space-y-2">
+                                      {/* 감정 */}
+                                      {(selectedReflection as any).EMO_emoji && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-lg">{(selectedReflection as any).EMO_emoji}</span>
+                                          <span className="text-xs font-black text-white/70">{(selectedReflection as any).EMO_spell}</span>
+                                        </div>
+                                      )}
+                                      {/* 감정 일기 */}
+                                      {(selectedReflection as any).EMO_reflectionText && (
+                                        <div>
+                                          <p className="text-[9px] font-black text-white/30 uppercase mb-1">감정 일기</p>
+                                          <p className="text-[11px] text-white/70 leading-relaxed line-clamp-3">
+                                            {(selectedReflection as any).EMO_reflectionText}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {/* 학습 목표 */}
+                                      {(selectedReflection as any).EDU_goal && (
+                                        <div>
+                                          <p className="text-[9px] font-black text-white/30 uppercase mb-1">학습 목표</p>
+                                          <p className="text-[11px] text-white/70 leading-relaxed line-clamp-2">
+                                            {(selectedReflection as any).EDU_goal}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {/* 배운 것 */}
+                                      {(selectedReflection as any).EDU_learned && (
+                                        <div>
+                                          <p className="text-[9px] font-black text-white/30 uppercase mb-1">배운 것</p>
+                                          <p className="text-[11px] text-white/70 leading-relaxed line-clamp-2">
+                                            {(selectedReflection as any).EDU_learned}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {/* 헷갈린 것 */}
+                                      {(selectedReflection as any).EDU_confused && (
+                                        <div>
+                                          <p className="text-[9px] font-black text-white/30 uppercase mb-1">헷갈린 것</p>
+                                          <p className="text-[11px] text-white/70 leading-relaxed line-clamp-2">
+                                            {(selectedReflection as any).EDU_confused}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {/* 학습 회고 */}
+                                      {(selectedReflection as any).EDU_reflectionText && (
+                                        <div>
+                                          <p className="text-[9px] font-black text-white/30 uppercase mb-1">학습 회고</p>
+                                          <p className="text-[11px] text-white/70 leading-relaxed line-clamp-3">
+                                            {(selectedReflection as any).EDU_reflectionText}
+                                          </p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[11px] text-white/30 font-medium">이 날은 작성된 회고가 없어요.</p>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })()}
+
                     <p className="text-xs text-white/50 leading-relaxed">
                       {emotionInsight.positive > emotionInsight.negative
                         ? `전반적으로 긍정적인 감정 상태를 유지하고 있어요. ${emotionInsight.top.label} 감정이 가장 두드러지게 나타나고 있습니다.`
