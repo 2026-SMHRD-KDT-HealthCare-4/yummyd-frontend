@@ -19,6 +19,9 @@ export default function Jar() {
   const [lastDrawnItem, setLastDrawnItem] = useState<any>(null);
   const [currentAvatar, setCurrentAvatar] = useState<any>(null);
   const [flashLayers, setFlashLayers] = useState<string[]>([]);
+  // 애니메이션 중 컬렉션 노출 제어: 캐릭터 reveal 전까지 뽑기 전 컬렉션 유지
+  const [frozenCollection, setFrozenCollection] = useState<any[] | null>(null);
+  const displayCollection = frozenCollection ?? collection;
 
   // 리마인드 상태 (오늘 날짜 기준 랜덤 EDU_confused)
   const [remindItem, setRemindItem] = useState<string | null>(null);
@@ -83,10 +86,13 @@ export default function Jar() {
   const handleDraw = async () => {
     if (isDrawing) return;
     setIsDrawing(true);
+    // 뽑기 전 컬렉션 스냅샷 고정 (애니메이션 중 새 캐릭터 노출 방지)
+    setFrozenCollection(collection);
     const res = await drawItem();
     if (!res.success) {
       alert(res.message);
       setIsDrawing(false);
+      setFrozenCollection(null);
       return;
     }
     const sequence = gradeSequence[res.item.grade as Grade];
@@ -113,6 +119,8 @@ export default function Jar() {
       setLastDrawnItem(res.item);
       setPhase("reveal");
       await fetchCollection();
+      // reveal 후 최신 컬렉션으로 교체
+      setFrozenCollection(null);
       setTimeout(() => setLastDrawnItem(null), 3000);
     }, revealTime);
     setTimeout(() => {
@@ -465,10 +473,10 @@ export default function Jar() {
           {/* My Collection */}
           <div className="bg-brand-surface/5 rounded-3xl p-5 border border-brand-surface/20">
             <h4 className="text-xs font-black text-brand-primary/40 uppercase tracking-[0.15em] px-1 mb-3">
-              My Collection ({collection.length})
+              My Collection ({displayCollection.length})
             </h4>
             <div className="grid grid-cols-4 gap-2">
-              {collection.map((item) => {
+              {displayCollection.map((item) => {
                 const avatar = item.Collection;
                 return (
                   <motion.button key={item.id} whileHover={{ scale: 1.08 }}
@@ -490,7 +498,7 @@ export default function Jar() {
                   </motion.button>
                 );
               })}
-              {collection.length === 0 && (
+              {displayCollection.length === 0 && (
                 <div className="col-span-4 py-8 text-center text-brand-primary/30 text-xs font-bold">
                   아직 수집한 아이템이 없어요.
                 </div>
