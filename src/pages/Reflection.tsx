@@ -328,27 +328,25 @@ export default function Reflection() {
     if (!canSubmit) return;
     if (!user) return alert('로그인이 필요합니다.');
 
-    const delayMinutes = startTimeRef.current
-      ? Math.floor((Date.now() - startTimeRef.current) / 60000)
+    const delaySeconds = startTimeRef.current
+      ? Math.floor((Date.now() - startTimeRef.current) / 1000)
       : 0;
-
-    // 백엔드 combinedText 로직과 보조를 맞추기 위해 origin_text 생성
-    const combinedText = `[Goal] ${todayGoal}\n[Learned] ${learned}\n[Confused] ${confused}\n[Review] ${review}\n[Memo] ${freeText || emotionOneLine}`;
 
     try {
       const response = await axios.post('/api/reflection', {
         userId: user.id,
-        delayMinutes,
-        origin_text: combinedText, // 물리 필드명 준수
-        image_data: studyImage || emotionImage, // 물리 필드명 준수
+        delayMinutes: delaySeconds,
+        EMO_reflectionText: emotionOneLine,
+        EDU_achievement: achievement,
+        image: emotionImage,
+        studyImage,
         emotionEmoji: selectedEmotion,
         selectedSpell: selectedSpell?.main ?? null,
-        // 분석을 위한 원시 데이터 함께 전달 (백엔드 processAnalysis 대응)
         todayGoal,
         learned,
         confused,
         review,
-        freeText: freeText || emotionOneLine
+        freeText,
       });
 
       if (response.data.success) {

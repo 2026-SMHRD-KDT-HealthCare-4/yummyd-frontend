@@ -25,17 +25,17 @@ const Navbar: React.FC = () => {
 
         {/* Desktop Menu */}
         <div className="hidden md:flex items-center gap-15">
-          <NavLink to="/" icon={<Home size={18} />} label="홈" active={isActive('/')} />
           {user.role === 'student' && (
             <>
+              <NavLink to="/" icon={<Home size={18} />} label="홈" active={isActive('/')} />
               <NavLink to="/reflection" icon={<PenLine size={18} />} label="기록하기" active={isActive('/reflection')} />
               <NavLink to="/jar" icon={<JarIcon size={18} />} label="유리병" active={isActive('/jar')} />
             </>
           )}
-          <NavLink to="/board" icon={<Users size={18} />} label="공감보드" active={isActive('/board')} />
           {(user.role === 'institution' || user.role === 'instructor') && (
-            <NavLink to="/inboard" icon={<Settings size={18} />} label="관리자" active={isActive('/inboard')} />
+            <NavLink to="/inboard" icon={<Settings size={18} />} label="관리자 대시보드" active={isActive('/inboard')} />
           )}
+          <NavLink to="/board" icon={<Users size={18} />} label="공감보드" active={isActive('/board')} />
         </div>
 
         {/* User Actions */}

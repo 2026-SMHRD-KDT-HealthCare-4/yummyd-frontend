@@ -2,11 +2,10 @@ import { motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import {
-  ArrowRight, PenLine, Users,
-  AlertCircle, Activity, Settings
+  ArrowRight, PenLine
 } from 'lucide-react';
 import { JarIcon } from '../assets/JarIcon';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import YummyCharacter from '../components/YummyCharacter';
 import QuotesBanner from '../components/QuotesBanner';
 import { Pinky, Goldy } from '../components/EmotionBuddies';
@@ -83,54 +82,6 @@ const StudentDashboard = ({ user }: any) => {
   );
 };
 
-const AdminDashboard = () => {
-  return (
-    <div className="space-y-10 max-w-6xl mx-auto px-6 pt-10 pb-20">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 mb-8">
-        <div className="space-y-2">
-           <div className="inline-flex items-center gap-2 px-3 py-1 bg-slate-900 text-white rounded-full text-[10px] font-black tracking-widest uppercase">
-              Administrator
-           </div>
-           <div className="flex items-center gap-4">
-              <h2 className="text-4xl font-black text-brand-primary tracking-tight">Management</h2>
-              <div className="flex items-center gap-2">
-                <Link to="/inboard" className="px-4 py-2 bg-brand-surface rounded-xl hover:bg-brand-gray transition-colors text-brand-primary/60 flex items-center gap-2 text-xs font-bold shadow-sm">
-                   상세 대시보드 <ArrowRight size={14} />
-                </Link>
-                <Link to="/settings" className="p-2 hover:bg-brand-surface rounded-xl transition-colors text-brand-primary/40">
-                   <Settings size={24} />
-                </Link>
-              </div>
-           </div>
-        </div>
-      </div>
-
-      <div className="w-full mb-12">
-         <QuotesBanner />
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-         {[
-           { label: '전체 수강생', value: '156명', icon: Users, color: 'text-brand-primary' },
-           { label: '금일 회고', value: '142명', icon: PenLine, color: 'text-brand-mint' },
-           { label: '미제출', value: '14명', icon: AlertCircle, color: 'text-brand-yellow' },
-           { label: '위험군', value: '3명', icon: Activity, color: 'text-brand-pink' },
-         ].map((stat, i) => {
-           const Icon = stat.icon;
-           return (
-             <div key={i} className="bg-white p-8 rounded-[2.5rem] border border-brand-surface shadow-md relative overflow-hidden group hover:translate-y-[-4px] transition-all">
-                <div className={`${stat.color} bg-current/10 w-12 h-12 rounded-2xl flex items-center justify-center mb-6`}>
-                  <Icon size={24} />
-                </div>
-                <p className="text-[11px] font-black text-brand-primary/40 uppercase tracking-widest mb-1">{stat.label}</p>
-                <p className="text-3xl font-black text-brand-primary">{stat.value}</p>
-             </div>
-           );
-         })}
-      </div>
-    </div>
-  );
-};
 
 export default function Home() {
   const user = useStore((state) => state.user);
@@ -144,18 +95,18 @@ export default function Home() {
     fetchBoard();
   }, [user, fetchHistory, fetchBoard]);
 
+  if ((user?.role as string) === 'institution' || user?.role === 'instructor') {
+    return <Navigate to="/inboard" replace />;
+  }
+
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="pt-0 min-h-screen"
     >
-      {user?.role === 'student' ? (
-        <StudentDashboard user={user} />
-      ) : (
-        <AdminDashboard />
-      )}
+      <StudentDashboard user={user} />
     </motion.div>
   );
 }
