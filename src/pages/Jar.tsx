@@ -45,19 +45,21 @@ export default function Jar() {
   const eduRef = useRef<HTMLDivElement>(null);
   const emoRef = useRef<HTMLDivElement>(null);
 
-  type Grade = 'common' | 'rare' | 'unique' | 'epic';
+  type Grade = 'common' | 'rare' | 'unique' | 'epic' | 'legend';
   const gradeSequence: Record<Grade, string[]> = {
     common: ['common'],
     rare: ['common', 'rare'],
     unique: ['common', 'rare', 'unique'],
-    epic: ['common', 'rare', 'unique', 'epic']
+    epic: ['common', 'rare', 'unique', 'epic'],
+    legend: ['common', 'rare', 'unique', 'epic', 'legend']
   };
 
   const gradeColor = {
     common: "#ffffff",
     rare: "#60a5fa",
     unique: "#a78bfa",
-    epic: "#fd4d08"
+    epic: "#fd4d08",
+    legend: "#111111"
   };
 
   useEffect(() => {
@@ -1165,7 +1167,7 @@ export default function Jar() {
                       <p className="text-[11px] font-black text-brand-primary/30 uppercase tracking-[0.2em] mb-1">New Item Unlocked</p>
                       <h2 className="text-2xl font-black text-brand-primary leading-tight mb-1">{result.name}</h2>
                       <p className="text-[12px] font-bold opacity-50" style={{ color: currentColor }}>
-                        {result.grade === 'epic' ? '✨ Legendary Discovery ✨' : 'Collection Updated'}
+                        {result.grade === 'legend' ? '✨ Legendary Discovery ✨' : 'Collection Updated'}
                       </p>
                     </div>
                   </div>
