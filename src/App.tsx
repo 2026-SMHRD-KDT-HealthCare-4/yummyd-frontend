@@ -112,7 +112,7 @@ function App() {
           <Route path="/board" element={user ? <StBoard /> : <Navigate to="/login" replace />} />
           <Route path="/settings" element={user ? <Settings /> : <Navigate to="/login" replace />} />
           
-          <Route path="/inboard" element={user?.role === 'institution' || user?.role === 'instructor' ? <InBoard /> : <Navigate to="/" replace />} />
+          <Route path="/inboard" element={(user as any)?.role === 'institution' || user?.role === 'instructor' ? <InBoard /> : <Navigate to="/" replace />} />
           
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -1,13 +1,34 @@
+<<<<<<< HEAD
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
 import { ShieldCheck, AlertTriangle, Users, PenLine, AlertCircle, ChevronDown, ChevronUp, Plus, TrendingDown, ChevronRight, Activity } from 'lucide-react';
+=======
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useStore } from '../store/useStore';
+import { Users, BarChart3, AlertTriangle, Heart, Send, Sparkles, BookOpen } from 'lucide-react';
+>>>>>>> main
 import axios from 'axios';
+import { io, Socket } from 'socket.io-client';
 
-interface Stats {
-  totalStudents: number;
-  todayReflections: number;
-  highRiskCount: number;
+// ── 기본 아바타: 유리병 SVG (장착 아이템 없을 때) ──────────────
+const JarAvatar = () => (
+  <svg viewBox="0 0 40 48" fill="none" className="w-full h-full">
+    <rect x="10" y="4" width="20" height="4" rx="2" fill="#4FD1A5" opacity="0.7" />
+    <path d="M8 8h24v28a8 8 0 01-8 8H16a8 8 0 01-8-8V8z" fill="#E8F5F0" stroke="#4FD1A5" strokeWidth="1.5" />
+    <ellipse cx="20" cy="24" rx="7" ry="9" fill="#4FD1A5" opacity="0.15" />
+  </svg>
+);
+
+interface CandyPost {
+  id: number;
+  text: string;
+  avatarUrl: string | null;
+  authorLabel: string;
+  likes: number;
+  likedBy: number[];
+  createdAt: string;
 }
 
 interface ClassStats {
@@ -148,6 +169,7 @@ export default function InBoard() {
     }
   };
 
+  // ── 강사용 통계 로드 ──────────────────────────────────────────
   useEffect(() => {
     if ((user?.role as string) === 'institution' || user?.role === 'instructor') {
       fetchStats();
@@ -166,9 +188,9 @@ export default function InBoard() {
         setNewGroupName('');
         fetchGroups();
       }
-    } catch (err) {
-      alert('클래스 생성 실패');
-    }
+    });
+    setInputText('');
+    setSending(false);
   };
 
   if ((user?.role as string) !== 'institution' && user?.role !== 'instructor') {
