@@ -52,12 +52,7 @@ export default function Jar() {
   if (isDrawing) return;
   setIsDrawing(true);
 
-  // 캔디 부족 체크
-  if ((user?.current_candy_count || 0) < 2) {
-    alert("캔디가 부족해요! 리플렉션을 작성해서 캔디를 모아보세요. 🍬");
-    setIsDrawing(false);
-    return;
-  }
+  // [Policy] 무료화 반영: 캔디 체크 로직 제거 (백엔드와 동기화)
 
   // 아이템 뽑기
   const res = await drawItem();

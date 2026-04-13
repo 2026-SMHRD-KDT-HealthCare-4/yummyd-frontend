@@ -98,18 +98,25 @@ export const useStore = create<YummyState>((set, get) => ({
     const { user } = get();
     if (!user) return;
     try {
-      const token = localStorage.getItem('yummy_token');
-      const res = await axios.get(`/api/collection/${user.id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.get(`/api/collection/${user.id}`);
       if (res.data.success) {
-       const sortedCollection = res.data.data.sort(
-        (a: CollectionItem, b: CollectionItem) => a.Collection.id - b.Collection.id
-      );
-      set({ collection: sortedCollection });
-    }
+        set({ collection: res.data.data });
+      }
     } catch (err) {
       console.error('Failed to fetch collection:', err);
+    }
+  },
+
+  updateReflection: async (id: number, data: any) => {
+    try {
+      const res = await axios.put(`/api/update/${id}`, data);
+      if (res.data.success) {
+        await get().fetchHistory(); // 기록 갱신
+        return { success: true };
+      }
+      return { success: false, message: res.data.message };
+    } catch (err: any) {
+      return { success: false, message: err.message };
     }
   },
 
@@ -117,13 +124,11 @@ export const useStore = create<YummyState>((set, get) => ({
     const { user } = get();
     if (!user) return { success: false, message: "로그인이 필요합니다." };
     try {
-      const token = localStorage.getItem('yummy_token');
-      const res = await axios.post('/api/collection/draw', { userId: user.id }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // [무료화 반영] 캔디 체크 없이 즉시 호출
+      const res = await axios.post('/api/collection/draw', { userId: user.id });
       if (res.data.success) {
         await get().fetchMe();
-        //await get().fetchCollection();
+        await get().fetchCollection();
         return { success: true, item: res.data.item };
       }
       return { success: false, message: res.data.message };
@@ -136,10 +141,7 @@ export const useStore = create<YummyState>((set, get) => ({
     const { user } = get();
     if (!user) return;
     try {
-      const token = localStorage.getItem('yummy_token');
-      await axios.post('/api/collection/toggle-equip', { userId: user.id, itemId }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await axios.post('/api/collection/toggle-equip', { userId: user.id, itemId });
       await get().fetchCollection();
     } catch (err) {
       console.error('Failed to toggle equip:', err);
