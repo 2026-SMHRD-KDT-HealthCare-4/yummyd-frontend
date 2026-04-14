@@ -1,14 +1,7 @@
-<<<<<<< HEAD
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useStore } from '../store/useStore';
-import { ShieldCheck, AlertTriangle, Users, PenLine, AlertCircle, ChevronDown, ChevronUp, Plus, TrendingDown, ChevronRight, Activity } from 'lucide-react';
-=======
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
-import { Users, BarChart3, AlertTriangle, Heart, Send, Sparkles, BookOpen } from 'lucide-react';
->>>>>>> main
+import { ShieldCheck, AlertTriangle, Users, PenLine, AlertCircle, ChevronDown, ChevronUp, Plus, TrendingDown, ChevronRight, Activity, BarChart3, Heart, Send, Sparkles, BookOpen } from 'lucide-react';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 
@@ -29,6 +22,12 @@ interface CandyPost {
   likes: number;
   likedBy: number[];
   createdAt: string;
+}
+
+interface Stats {
+  totalStudents: number;
+  todayReflections: number;
+  highRiskCount: number;
 }
 
 interface ClassStats {
@@ -188,9 +187,9 @@ export default function InBoard() {
         setNewGroupName('');
         fetchGroups();
       }
-    });
-    setInputText('');
-    setSending(false);
+    } catch (err) {
+      alert('클래스 생성 실패');
+    }
   };
 
   if ((user?.role as string) !== 'institution' && user?.role !== 'instructor') {
