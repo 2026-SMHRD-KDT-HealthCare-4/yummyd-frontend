@@ -23,6 +23,7 @@ interface Student {
   username: string;
   enroll_status: string;
   isHighRisk: boolean;
+  isEverHighRisk: boolean;
 }
 
 interface ConsultEntry {
@@ -77,7 +78,7 @@ export default function InBoard() {
   const [selectedClass, setSelectedClass] = useState<{ id: number; class_name: string } | null>(null);
   const [classStats, setClassStats] = useState<ClassStats | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
-  const [studentFilter, setStudentFilter] = useState<'all' | 'highRisk' | 'dropout'>('all');
+  const [studentFilter, setStudentFilter] = useState<'all' | 'highRisk' | 'everHighRisk' | 'dropout'>('all');
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [monitoringHistory, setMonitoringHistory] = useState<any[]>([]);
 
@@ -104,7 +105,7 @@ export default function InBoard() {
   const [editContent, setEditContent] = useState('');
 
   // ── 리포트 상태
-  const [reportFilter, setReportFilter] = useState<'all' | 'highRisk' | 'dropout'>('all');
+  const [reportFilter, setReportFilter] = useState<'all' | 'highRisk' | 'everHighRisk' | 'dropout'>('all');
   const [reportIndividualName, setReportIndividualName] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -374,40 +375,19 @@ export default function InBoard() {
     document.body.appendChild(iframe);
   };
 
-  // 리포트용 감정 HTML 생성 (상위 N개, 긍정/부정 색상)
-  const getTopEmotionsHtml = (m: any, topN = 5): string => {
-    const sorted = [...ALL_EMOTION_KEYS]
-      .map(e => ({ ...e, val: parseFloat(m[e.key]) || 0 }))
-      .filter(e => e.val > 0)
-      .sort((a, b) => b.val - a.val)
-      .slice(0, topN);
-    if (sorted.length === 0) return '<span style="color:#999">-</span>';
-    return sorted.map(e =>
-      `<span style="display:inline-block;margin:1px 3px;padding:1px 6px;border-radius:4px;font-size:11px;font-weight:700;background:${e.positive ? '#d1fae5' : '#fee2e2'};color:${e.positive ? '#065f46' : '#991b1b'}">${e.label} ${(e.val * 100).toFixed(0)}%</span>`
-    ).join('');
-  };
-
-  const getDropoutReasons = (m: any): string[] => {
-    const reasons: string[] = [];
-    if (m.EDU_delay_time != null && m.EDU_delay_time > 300) reasons.push(`학습회고 지연시간 과다 (${m.EDU_delay_time}초)`);
-    if (m.EDU_char_count != null && m.EDU_char_count < 50) reasons.push(`학습회고 글자수 부족 (${m.EDU_char_count}자)`);
-    if (m.cumulative_absence_days != null && m.cumulative_absence_days >= 3) reasons.push(`회고 미작성 누적일 높음 (${m.cumulative_absence_days}일)`);
-    if (m.cumulative_days != null && m.cumulative_absence_days != null) {
-      const total = m.cumulative_days + m.cumulative_absence_days;
-      if (total > 0 && m.cumulative_absence_days / total > 0.3) reasons.push(`미작성 비율 높음 (${Math.round(m.cumulative_absence_days / total * 100)}%)`);
-    }
-    if (m.dropout_prob != null && m.dropout_prob > 0.6) reasons.push(`AI 이탈 예측 확률 높음 (${(m.dropout_prob * 100).toFixed(1)}%)`);
-    return reasons;
-  };
 
   const generateGroupReport = async () => {
     if (!selectedClass || students.length === 0) return;
     const targetStudents = students.filter(s => {
       if (reportFilter === 'highRisk') return s.isHighRisk;
+      if (reportFilter === 'everHighRisk') return s.isEverHighRisk;
       if (reportFilter === 'dropout') return s.enroll_status === 'dropout';
       return true;
     });
-    const filterLabel = reportFilter === 'highRisk' ? '중도이탈 위험군' : reportFilter === 'dropout' ? '중도이탈 수강생' : '전체 수강생';
+    const filterLabel = reportFilter === 'highRisk' ? '중도이탈 위험군'
+      : reportFilter === 'everHighRisk' ? '중도이탈위험 경험군'
+      : reportFilter === 'dropout' ? '중도이탈 수강생'
+      : '전체 수강생';
     const now = new Date().toLocaleString('ko-KR');
     const token = localStorage.getItem('yummy_token');
     const config = { headers: { Authorization: `Bearer ${token}` } };
@@ -416,33 +396,72 @@ export default function InBoard() {
     try {
       let rows = '';
       if (reportFilter === 'highRisk') {
-        // 위험군: 모니터링 데이터 조회 후 이탈 예측 근거 포함
+        // 위험군: 최근 7일 평균 기반
         const studentData = await Promise.all(
           targetStudents.map(async (s, i) => {
             try {
               const res = await axios.get(`/api/admin/student-monitoring-history?user_id=${s.id}`, config);
               const history: any[] = res.data.success ? res.data.data : [];
-              const latest = history[history.length - 1] ?? null;
-              return { s, i, latest };
+              const recent7 = history.slice(-7);
+              return { s, i, recent7 };
             } catch {
-              return { s, i, latest: null };
+              return { s, i, recent7: [] };
             }
           })
         );
 
-        rows = studentData.map(({ s, i, latest }) => {
-          const reasons = latest ? getDropoutReasons(latest) : [];
-          const dropoutProb = latest?.dropout_prob != null ? `${(latest.dropout_prob * 100).toFixed(1)}%` : '-';
+        rows = studentData.map(({ s, i, recent7 }) => {
+          if (recent7.length === 0) {
+            return `<tr><td>${i + 1}</td><td>${s.username}</td><td style="color:#e11d48;font-weight:700">위험군</td><td colspan="4" style="color:#999">데이터 없음</td></tr>`;
+          }
+
+          // 7일 평균 이탈확률
+          const validProbs = recent7.filter((r: any) => r.dropout_prob != null);
+          const avgProb = validProbs.length > 0
+            ? validProbs.reduce((s: number, r: any) => s + parseFloat(r.dropout_prob), 0) / validProbs.length
+            : null;
+          const dropoutProb = avgProb != null ? `${(avgProb * 100).toFixed(1)}%` : '-';
+          const highRiskDays = recent7.filter((r: any) => r.dropout_prob != null && parseFloat(r.dropout_prob) >= 0.99).length;
+
+          // 7일 평균 기반 이탈 예측 근거
+          const avgDelay = Math.round(recent7.reduce((s: number, r: any) => s + (r.EDU_delay_time || 0), 0) / recent7.length);
+          const avgChars = Math.round(recent7.reduce((s: number, r: any) => s + (r.EDU_char_count || 0), 0) / recent7.length);
+          const latestRow = recent7[recent7.length - 1];
+          const absDays = latestRow?.cumulative_absence_days ?? 0;
+          const cumDays = latestRow?.cumulative_days ?? 0;
+          const absRatio = (cumDays + absDays) > 0 ? absDays / (cumDays + absDays) : 0;
+
+          const reasons: string[] = [];
+          if (avgDelay > 300) reasons.push(`평균 지연시간 과다 (${avgDelay}초)`);
+          if (avgChars < 50)  reasons.push(`평균 글자수 부족 (${avgChars}자)`);
+          if (absDays >= 3)   reasons.push(`회고 미작성 누적 (${absDays}일)`);
+          if (absRatio > 0.3) reasons.push(`미작성 비율 높음 (${Math.round(absRatio * 100)}%)`);
+          if (highRiskDays > 0) reasons.push(`고위험 판정 ${highRiskDays}일 / 최근 ${recent7.length}일`);
+          if (avgProb != null && avgProb > 0.6) reasons.push(`7일 평균 이탈확률 높음 (${(avgProb * 100).toFixed(1)}%)`);
+
           const reasonHtml = reasons.length > 0
             ? `<ul style="margin:0;padding-left:16px;">${reasons.map(r => `<li>${r}</li>`).join('')}</ul>`
-            : '<span style="color:#999">데이터 없음</span>';
-          const emotionHtml = latest ? getTopEmotionsHtml(latest, 4) : '<span style="color:#999">-</span>';
+            : '<span style="color:#999">특이사항 없음</span>';
+
+          // 7일 평균 주요 감정
+          const emotionHtml = (() => {
+            const sorted = [...ALL_EMOTION_KEYS]
+              .map(e => ({ ...e, val: recent7.reduce((s: number, r: any) => s + (parseFloat(r[e.key]) || 0), 0) / recent7.length }))
+              .filter(e => e.val > 0)
+              .sort((a, b) => b.val - a.val)
+              .slice(0, 4);
+            if (sorted.length === 0) return '<span style="color:#999">-</span>';
+            return sorted.map(e =>
+              `<span style="display:inline-block;margin:1px 2px;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;background:${e.positive ? '#d1fae5' : '#fee2e2'};color:${e.positive ? '#065f46' : '#991b1b'}">${e.label} ${(e.val * 100).toFixed(0)}%</span>`
+            ).join('');
+          })();
+
           return `
             <tr>
               <td>${i + 1}</td>
               <td>${s.username}</td>
               <td style="color:#e11d48;font-weight:700">위험군</td>
-              <td>${dropoutProb}</td>
+              <td style="font-weight:700">${dropoutProb}<br><span style="font-size:10px;color:#9ca3af;font-weight:400">7일 평균</span></td>
               <td>${reasonHtml}</td>
               <td>${emotionHtml}</td>
             </tr>`;
@@ -454,22 +473,120 @@ export default function InBoard() {
             body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; color: #1a1a1a; }
             h1 { font-size: 22px; margin-bottom: 4px; }
             .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
-            table { width: 100%; border-collapse: collapse; font-size: 13px; }
-            th { background: #1E4D3A; color: white; padding: 10px 14px; text-align: left; }
-            td { padding: 9px 14px; border-bottom: 1px solid #eee; vertical-align: top; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #1E4D3A; color: white; padding: 9px 12px; text-align: left; font-size: 11px; }
+            td { padding: 8px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
             tr:nth-child(even) td { background: #f9fafb; }
             li { margin-bottom: 2px; }
             .warn { color: #e11d48; font-size: 11px; font-weight: 700; background: #fff0f3; padding: 2px 6px; border-radius: 4px; margin-bottom: 8px; display: inline-block; }
             @media print { body { padding: 20px; } }
           </style></head><body>
           <h1>${selectedClass.class_name} — ${filterLabel} 리포트</h1>
-          <p class="meta">생성일시: ${now} &nbsp;|&nbsp; 총 ${targetStudents.length}명</p>
-          <p class="warn">※ 이탈 예측 근거는 최근 제출된 학습회고 데이터 기준입니다.</p>
+          <p class="meta">생성일시: ${now} &nbsp;|&nbsp; 총 ${targetStudents.length}명 &nbsp;|&nbsp; 기준: 최근 7일 평균</p>
+          <p class="warn">※ 이탈확률·예측근거·감정은 최근 7일 데이터의 평균값 기준입니다.</p>
           <table>
-            <thead><tr><th>#</th><th>이름</th><th>상태</th><th>이탈확률</th><th>이탈 예측 근거</th><th>주요 감정</th></tr></thead>
+            <thead><tr><th>#</th><th>이름</th><th>상태</th><th>이탈확률(7일 평균)</th><th>이탈 예측 근거</th><th>주요 감정(7일 평균)</th></tr></thead>
             <tbody>${rows}</tbody>
           </table>
-          <script>window.onbeforeunload = () => { if (window.opener) window.opener.postMessage('__report_closed__', '*'); }; window.onload = () => { window.print(); window.close(); };<\/script>
+          </body></html>`;
+
+        printHTML(html);
+      } else if (reportFilter === 'everHighRisk') {
+        // 위험 경험군: 7일 평균 기반 + 현재 상태 표기
+        const studentData = await Promise.all(
+          targetStudents.map(async (s, i) => {
+            try {
+              const res = await axios.get(`/api/admin/student-monitoring-history?user_id=${s.id}`, config);
+              const history: any[] = res.data.success ? res.data.data : [];
+              const recent7 = history.slice(-7);
+              return { s, i, recent7 };
+            } catch {
+              return { s, i, recent7: [] };
+            }
+          })
+        );
+
+        rows = studentData.map(({ s, i, recent7 }) => {
+          const currentStatus = s.enroll_status === 'dropout' ? '중도이탈'
+            : s.isHighRisk ? '위험군'
+            : '경험군(회복)';
+          const statusColor = s.enroll_status === 'dropout' ? '#d97706'
+            : s.isHighRisk ? '#e11d48'
+            : '#ea580c';
+
+          if (recent7.length === 0) {
+            return `<tr><td>${i + 1}</td><td>${s.username}</td><td style="color:${statusColor};font-weight:700">${currentStatus}</td><td colspan="4" style="color:#999">데이터 없음</td></tr>`;
+          }
+
+          const validProbs = recent7.filter((r: any) => r.dropout_prob != null);
+          const avgProb = validProbs.length > 0
+            ? validProbs.reduce((acc: number, r: any) => acc + parseFloat(r.dropout_prob), 0) / validProbs.length
+            : null;
+          const dropoutProb = avgProb != null ? `${(avgProb * 100).toFixed(1)}%` : '-';
+          const highRiskDays = recent7.filter((r: any) => r.dropout_prob != null && parseFloat(r.dropout_prob) >= 0.99).length;
+
+          const avgDelay = Math.round(recent7.reduce((acc: number, r: any) => acc + (r.EDU_delay_time || 0), 0) / recent7.length);
+          const avgChars = Math.round(recent7.reduce((acc: number, r: any) => acc + (r.EDU_char_count || 0), 0) / recent7.length);
+          const latestRow = recent7[recent7.length - 1];
+          const absDays = latestRow?.cumulative_absence_days ?? 0;
+          const cumDays = latestRow?.cumulative_days ?? 0;
+          const absRatio = (cumDays + absDays) > 0 ? absDays / (cumDays + absDays) : 0;
+
+          const reasons: string[] = [];
+          if (avgDelay > 300) reasons.push(`평균 지연시간 과다 (${avgDelay}초)`);
+          if (avgChars < 50)  reasons.push(`평균 글자수 부족 (${avgChars}자)`);
+          if (absDays >= 3)   reasons.push(`회고 미작성 누적 (${absDays}일)`);
+          if (absRatio > 0.3) reasons.push(`미작성 비율 높음 (${Math.round(absRatio * 100)}%)`);
+          if (highRiskDays > 0) reasons.push(`최근 7일 중 고위험 판정 ${highRiskDays}일`);
+          if (avgProb != null && avgProb > 0.6) reasons.push(`7일 평균 이탈확률 높음 (${(avgProb * 100).toFixed(1)}%)`);
+          if (reasons.length === 0 && avgProb != null && avgProb <= 0.5) reasons.push('최근 7일 기준 안정 상태');
+
+          const reasonHtml = `<ul style="margin:0;padding-left:16px;">${reasons.map(r => `<li>${r}</li>`).join('')}</ul>`;
+
+          const emotionHtml = (() => {
+            const sorted = [...ALL_EMOTION_KEYS]
+              .map(e => ({ ...e, val: recent7.reduce((acc: number, r: any) => acc + (parseFloat(r[e.key]) || 0), 0) / recent7.length }))
+              .filter(e => e.val > 0)
+              .sort((a, b) => b.val - a.val)
+              .slice(0, 4);
+            if (sorted.length === 0) return '<span style="color:#999">-</span>';
+            return sorted.map(e =>
+              `<span style="display:inline-block;margin:1px 2px;padding:1px 6px;border-radius:3px;font-size:10px;font-weight:700;background:${e.positive ? '#d1fae5' : '#fee2e2'};color:${e.positive ? '#065f46' : '#991b1b'}">${e.label} ${(e.val * 100).toFixed(0)}%</span>`
+            ).join('');
+          })();
+
+          return `
+            <tr>
+              <td>${i + 1}</td>
+              <td>${s.username}</td>
+              <td style="color:${statusColor};font-weight:700">${currentStatus}</td>
+              <td style="font-weight:700">${dropoutProb}<br><span style="font-size:10px;color:#9ca3af;font-weight:400">7일 평균</span></td>
+              <td>${reasonHtml}</td>
+              <td>${emotionHtml}</td>
+            </tr>`;
+        }).join('');
+
+        const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+          <title>${selectedClass.class_name} ${filterLabel} 리포트</title>
+          <style>
+            body { font-family: 'Malgun Gothic', sans-serif; padding: 40px; color: #1a1a1a; }
+            h1 { font-size: 22px; margin-bottom: 4px; }
+            .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; }
+            th { background: #ea580c; color: white; padding: 9px 12px; text-align: left; font-size: 11px; }
+            td { padding: 8px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+            tr:nth-child(even) td { background: #f9fafb; }
+            li { margin-bottom: 2px; }
+            .warn { color: #ea580c; font-size: 11px; font-weight: 700; background: #fff7ed; padding: 2px 6px; border-radius: 4px; margin-bottom: 8px; display: inline-block; }
+            @media print { body { padding: 20px; } }
+          </style></head><body>
+          <h1>${selectedClass.class_name} — ${filterLabel} 리포트</h1>
+          <p class="meta">생성일시: ${now} &nbsp;|&nbsp; 총 ${targetStudents.length}명 &nbsp;|&nbsp; 기준: 최근 7일 평균</p>
+          <p class="warn">※ 과거에 이탈확률 99% 이상을 기록한 이력이 있는 수강생 목록입니다. 현재 상태(위험군/경험군(회복)/중도이탈)를 함께 확인하세요.</p>
+          <table>
+            <thead><tr><th>#</th><th>이름</th><th>현재 상태</th><th>이탈확률(7일 평균)</th><th>최근 7일 동향</th><th>주요 감정(7일 평균)</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
           </body></html>`;
 
         printHTML(html);
@@ -529,8 +646,14 @@ export default function InBoard() {
       const history: any[] = monRes.data.success ? monRes.data.data : [];
       const entries: ConsultEntry[] = consultRes.data.success ? parseConsultEntries(consultRes.data.data.note || '') : [];
       const now = new Date().toLocaleString('ko-KR');
-      const statusLabel = target.enroll_status === 'dropout' ? '중도이탈' : target.isHighRisk ? '위험군' : '정상';
-      const statusColor = target.enroll_status === 'dropout' ? '#d97706' : target.isHighRisk ? '#e11d48' : '#059669';
+      const statusLabel = target.enroll_status === 'dropout' ? '중도이탈'
+        : target.isHighRisk ? '위험군'
+        : target.isEverHighRisk ? '경험군(회복)'
+        : '정상';
+      const statusColor = target.enroll_status === 'dropout' ? '#d97706'
+        : target.isHighRisk ? '#e11d48'
+        : target.isEverHighRisk ? '#ea580c'
+        : '#059669';
 
       // 최근 7일 데이터
       const recent7 = history.slice(-7);
@@ -717,6 +840,7 @@ export default function InBoard() {
   const todayReflections = stats?.todayReflections || 0;
   const filteredStudents = students.filter(s => {
     if (studentFilter === 'highRisk') return s.isHighRisk;
+    if (studentFilter === 'everHighRisk') return s.isEverHighRisk;
     if (studentFilter === 'dropout') return s.enroll_status === 'dropout';
     return true;
   });
@@ -1046,7 +1170,12 @@ export default function InBoard() {
                           <span className="text-[11px] font-black text-brand-mint">(상담내용 총 {consultEntries.length}개)</span>
                         </div>
                         <p className="text-[10px] font-bold text-brand-primary/50 mb-1">
-                          {consultEntries[consultEntries.length - 1].date}
+                          입력: {consultEntries[consultEntries.length - 1].date}
+                          {consultEntries[consultEntries.length - 1].editedAt && (
+                            <span className="text-brand-primary/30 ml-2">
+                              | 수정: {consultEntries[consultEntries.length - 1].editedAt}
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs font-bold text-brand-primary/80 line-clamp-3">
                           {consultEntries[consultEntries.length - 1].content}
@@ -1084,14 +1213,17 @@ export default function InBoard() {
             <div className="lg:col-span-2 bg-white px-6 py-6 rounded-2xl border border-brand-surface shadow-sm space-y-4">
               <h3 className="text-sm font-black text-brand-primary">수강생 정밀 모니터링</h3>
               <div className="flex flex-col gap-2">
-                {(['all', 'highRisk', 'dropout'] as const).map(f => (
-                  <label key={f} className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="studentFilter" checked={studentFilter === f} onChange={() => setStudentFilter(f)}
-                      className={`w-3.5 h-3.5 ${f === 'highRisk' ? 'accent-brand-pink' : f === 'dropout' ? 'accent-brand-yellow' : 'accent-brand-primary'}`}
+                {([
+                  { value: 'all',          label: '전체 보기',           accent: 'accent-brand-primary', color: 'text-brand-primary' },
+                  { value: 'highRisk',     label: '중도이탈 위험군',      accent: 'accent-brand-pink',    color: 'text-brand-pink' },
+                  { value: 'everHighRisk', label: '중도이탈위험 경험군',  accent: 'accent-orange-400',    color: 'text-orange-400' },
+                  { value: 'dropout',      label: '중도이탈 수강생',      accent: 'accent-brand-yellow',  color: 'text-brand-yellow' },
+                ] as const).map(f => (
+                  <label key={f.value} className="flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="studentFilter" checked={studentFilter === f.value} onChange={() => setStudentFilter(f.value)}
+                      className={`w-3.5 h-3.5 ${f.accent}`}
                     />
-                    <span className={`text-[11px] font-black ${f === 'highRisk' ? 'text-brand-pink' : f === 'dropout' ? 'text-brand-yellow' : 'text-brand-primary'}`}>
-                      {f === 'all' ? '전체 보기' : f === 'highRisk' ? '중도이탈 위험군' : '중도이탈 수강생'}
-                    </span>
+                    <span className={`text-[11px] font-black ${f.color}`}>{f.label}</span>
                   </label>
                 ))}
               </div>
@@ -1100,10 +1232,13 @@ export default function InBoard() {
                   <div key={s.id} onClick={() => handleStudentClick(s)}
                     className={`flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer transition-all ${selectedStudent?.id === s.id ? 'bg-brand-primary text-white' : 'bg-brand-surface0 hover:bg-brand-surface'}`}
                   >
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${s.enroll_status === 'dropout' ? 'bg-brand-yellow' : s.isHighRisk ? 'bg-brand-pink animate-pulse' : 'bg-brand-mint'}`} />
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${s.enroll_status === 'dropout' ? 'bg-brand-yellow' : s.isHighRisk ? 'bg-brand-pink animate-pulse' : s.isEverHighRisk ? 'bg-orange-400' : 'bg-brand-mint'}`} />
                     <span className={`text-xs font-bold flex-1 ${selectedStudent?.id === s.id ? 'text-white' : 'text-brand-primary'}`}>{s.username}</span>
                     {s.isHighRisk && s.enroll_status !== 'dropout' && (
                       <span className="text-[9px] font-black text-brand-pink bg-rose-50 px-2 py-0.5 rounded-full">위험군</span>
+                    )}
+                    {!s.isHighRisk && s.isEverHighRisk && s.enroll_status !== 'dropout' && (
+                      <span className="text-[9px] font-black text-orange-400 bg-orange-50 px-2 py-0.5 rounded-full">경험군</span>
                     )}
                     {s.enroll_status === 'dropout' && (
                       <span className="text-[9px] font-black text-brand-yellow bg-amber-50 px-2 py-0.5 rounded-full">중도이탈</span>
@@ -1123,9 +1258,10 @@ export default function InBoard() {
                   <p className="text-[10px] font-black text-brand-primary/40 uppercase tracking-widest">그룹 리포트</p>
                   <div className="flex flex-col gap-1.5">
                     {([
-                      { value: 'all',      label: '전체 수강생' },
-                      { value: 'highRisk', label: '중도이탈 위험군' },
-                      { value: 'dropout',  label: '중도이탈 수강생' },
+                      { value: 'all',          label: '전체 수강생',          accent: 'accent-brand-primary', color: 'text-brand-primary/70' },
+                      { value: 'highRisk',     label: '중도이탈 위험군',       accent: 'accent-brand-pink',    color: 'text-brand-pink' },
+                      { value: 'everHighRisk', label: '중도이탈위험 경험군',   accent: 'accent-orange-400',    color: 'text-orange-400' },
+                      { value: 'dropout',      label: '중도이탈 수강생',       accent: 'accent-brand-yellow',  color: 'text-brand-yellow' },
                     ] as const).map(opt => (
                       <label key={opt.value} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -1133,9 +1269,9 @@ export default function InBoard() {
                           name="reportFilter"
                           checked={reportFilter === opt.value}
                           onChange={() => setReportFilter(opt.value)}
-                          className="w-3.5 h-3.5 accent-brand-primary"
+                          className={`w-3.5 h-3.5 ${opt.accent}`}
                         />
-                        <span className="text-[11px] font-bold text-brand-primary/70">{opt.label}</span>
+                        <span className={`text-[11px] font-bold ${opt.color}`}>{opt.label}</span>
                       </label>
                     ))}
                   </div>
@@ -1208,7 +1344,12 @@ export default function InBoard() {
                   return (
                     <div key={realIndex} className="bg-brand-surface0 rounded-2xl px-5 py-4 space-y-2">
                       <div className="flex items-center justify-between">
-                        <p className="text-[10px] font-black text-brand-primary/40">{entry.date}</p>
+                        <p className="text-[10px] font-black text-brand-primary/40">
+                          입력: {entry.date}
+                          {entry.editedAt && (
+                            <span className="text-brand-primary/30 ml-2">| 수정: {entry.editedAt}</span>
+                          )}
+                        </p>
                         {!isEditing ? (
                           <button
                             onClick={() => { setEditingIndex(realIndex); setEditContent(entry.content); }}

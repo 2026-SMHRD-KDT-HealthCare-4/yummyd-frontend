@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useStore } from '../store/useStore';
-import { Heart, Send, Sparkles, BookOpen, Users } from 'lucide-react';
+import { Heart, Send, Sparkles, BookOpen, Users, Pencil, Trash2, Check, X } from 'lucide-react';
 import candyDefault from '../assets/candyEmoji_normal.png';
 import { Minty, Pinky, Goldy } from '../components/EmotionBuddies';
 import { io, Socket } from 'socket.io-client';
@@ -18,6 +18,7 @@ interface CandyPost {
   avatarUrl: string | null;
   avatarIsVideo: boolean;
   authorLabel: string;
+  authorId: number | null;
   likes: number;
   likedBy: number[];
   createdAt: string;
@@ -32,9 +33,23 @@ export default function StBoard() {
   const [sending, setSending] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
+  // ── 편집 상태
+  const [editingPostId, setEditingPostId] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
+
   // ── 반 confused 배너 상태
   const [confusedEntries, setConfusedEntries] = useState<{ userId: number; text: string }[]>([]);
   const [totalStudents, setTotalStudents] = useState(0);
+
+  // ── 강사용: 관리 클래스 목록 + 선택된 클래스
+  const isInstructor = user?.role === 'instructor' || (user?.role as string) === 'institution';
+  const [instructorClasses, setInstructorClasses] = useState<{ id: number; class_name: string }[]>([]);
+  const [instructorClassId, setInstructorClassId] = useState<number | null>(null);
+
+  // 실제 사용할 classId
+  const effectiveClassId: number | undefined = isInstructor
+    ? (instructorClassId ?? undefined)
+    : ((user as any)?.class_id ?? undefined);
 
   // ── 장착 아이템
   const equippedItem = useMemo(() => collection.find(i => i.is_equipped), [collection]);
@@ -123,11 +138,24 @@ export default function StBoard() {
     fetchCollection();
   }, []);
 
+  // ── 강사: 관리 클래스 목록 로드
   useEffect(() => {
-    const classId = (user as any)?.class_id;
-    if (!classId) return;
+    if (!isInstructor) return;
     const token = localStorage.getItem('yummy_token');
-    axios.get(`/api/classes/reflections/${classId}`, {
+    axios.get('/api/classes/my-classes', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => {
+        if (r.data.success && r.data.classes.length > 0) {
+          setInstructorClasses(r.data.classes);
+          setInstructorClassId(r.data.classes[0].id); // 첫 번째 클래스 자동 선택
+        }
+      }).catch(() => {});
+  }, [isInstructor]);
+
+  // ── confused 배너 데이터
+  useEffect(() => {
+    if (!effectiveClassId) return;
+    const token = localStorage.getItem('yummy_token');
+    axios.get(`/api/classes/reflections/${effectiveClassId}`, {
       headers: { Authorization: `Bearer ${token}` }
     }).then(r => {
       if (r.data.success) {
@@ -135,19 +163,24 @@ export default function StBoard() {
         setTotalStudents(r.data.totalStudents);
       }
     }).catch(() => {});
-  }, [user]);
+  }, [effectiveClassId]);
 
-  // ── Socket.io 연결
+  // ── Socket.io 연결 (effectiveClassId 변경 시 재연결)
   useEffect(() => {
-    if (!user) return;
-    const classId = (user as any)?.class_id;
-    if (!classId) return;
+    if (!user || !effectiveClassId) return;
+
+    // 기존 소켓 정리
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    setPosts([]);
 
     const socket = io('http://localhost:5000', { transports: ['websocket'] });
     socketRef.current = socket;
 
     socket.on('connect', () => {
-      socket.emit('join', { userId: user.id, classId });
+      socket.emit('join', { userId: user.id, classId: effectiveClassId });
     });
 
     socket.on('candy_board_init', (initPosts: CandyPost[]) => {
@@ -162,29 +195,68 @@ export default function StBoard() {
       setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes, likedBy } : p));
     });
 
+    socket.on('candy_post_edited', ({ postId, newText }: { postId: number; newText: string }) => {
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, text: newText } : p));
+    });
+
+    socket.on('candy_post_deleted', ({ postId }: { postId: number }) => {
+      setPosts(prev => prev.filter(p => p.id !== postId));
+    });
+
     return () => { socket.disconnect(); };
-  }, [user]);
+  }, [user, effectiveClassId]);
 
   // ── 캔디 던지기
   const handleSend = () => {
     const text = inputText.trim();
-    if (!text || sending || !socketRef.current) return;
-    const classId = (user as any)?.class_id;
-    if (!classId) return;
+    if (!text || sending || !socketRef.current || !effectiveClassId) return;
     setSending(true);
+    const postAvatar  = isInstructor ? null : equippedAvatar;
+    const postIsVideo = isInstructor ? false : equippedIsVideo;
+    const postLabel   = isInstructor ? 'yummy:D' : (equippedAvatar ? equippedLabel : 'yummy:D');
     socketRef.current.emit('candy_post', {
-      classId,
-      post: { text, avatarUrl: equippedAvatar, avatarIsVideo: equippedIsVideo, authorLabel: equippedAvatar ? equippedLabel : 'yummy:D' }
+      classId: effectiveClassId,
+      post: { text, avatarUrl: postAvatar, avatarIsVideo: postIsVideo, authorLabel: postLabel, authorId: user?.id ?? null }
     });
     setInputText('');
     setSending(false);
   };
 
+  // ── 편집 시작
+  const startEdit = (post: CandyPost) => {
+    setEditingPostId(post.id);
+    setEditText(post.text);
+  };
+
+  // ── 편집 저장
+  const submitEdit = (postId: number) => {
+    if (!editText.trim() || !socketRef.current || !effectiveClassId || !user) return;
+    socketRef.current.emit('candy_edit', {
+      classId: effectiveClassId,
+      postId,
+      userId: user.id,
+      newText: editText.trim()
+    });
+    setEditingPostId(null);
+    setEditText('');
+  };
+
+  // ── 삭제
+  const handleDelete = (postId: number) => {
+    if (!socketRef.current || !effectiveClassId || !user) return;
+    if (!window.confirm('이 캔디를 삭제할까요?')) return;
+    socketRef.current.emit('candy_delete', {
+      classId: effectiveClassId,
+      postId,
+      userId: user.id,
+      isInstructor
+    });
+  };
+
   // ── 하트
   const handleLike = (postId: number) => {
-    if (!socketRef.current || !user) return;
-    const classId = (user as any)?.class_id;
-    socketRef.current.emit('candy_like', { classId, postId, userId: user.id });
+    if (!socketRef.current || !user || !effectiveClassId) return;
+    socketRef.current.emit('candy_like', { classId: effectiveClassId, postId, userId: user.id });
   };
 
   return (
@@ -249,6 +321,24 @@ export default function StBoard() {
         </div>
       </motion.div>
 
+      {/* ── 강사용 클래스 선택 ──────────────────────────── */}
+      {isInstructor && instructorClasses.length > 0 && (
+        <div className="flex items-center gap-3 bg-white rounded-2xl px-5 py-3 border border-brand-surface shadow-sm">
+          <span className="text-xs font-black text-brand-primary/50 uppercase tracking-widest shrink-0">클래스 선택</span>
+          <div className="flex flex-wrap gap-2">
+            {instructorClasses.map(c => (
+              <button
+                key={c.id}
+                onClick={() => setInstructorClassId(c.id)}
+                className={`px-4 py-1.5 rounded-xl text-xs font-black transition-all ${instructorClassId === c.id ? 'bg-brand-primary text-white shadow' : 'bg-brand-surface/60 text-brand-primary/50 hover:bg-brand-surface'}`}
+              >
+                {c.class_name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ── 블라블라 캔디 ────────────────────────────────── */}
       <div className="space-y-5">
         <div className="flex items-center gap-3 px-2">
@@ -304,6 +394,11 @@ export default function StBoard() {
               </motion.div>
             ) : posts.map(post => {
               const liked = user ? post.likedBy.includes(user.id) : false;
+              const isOwn = post.authorId !== null && post.authorId === user?.id;
+              const canEdit = isOwn;
+              const canDelete = isOwn || isInstructor;
+              const isEditing = editingPostId === post.id;
+
               return (
                 <motion.div
                   key={post.id}
@@ -331,21 +426,62 @@ export default function StBoard() {
                         {new Date(post.createdAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
-                    <p className="text-brand-primary font-bold text-base leading-relaxed">{post.text}</p>
+                    {isEditing ? (
+                      <div className="flex items-center gap-2 mt-1">
+                        <input
+                          value={editText}
+                          onChange={e => setEditText(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') submitEdit(post.id); if (e.key === 'Escape') setEditingPostId(null); }}
+                          autoFocus
+                          className="flex-1 bg-brand-surface/60 rounded-xl px-4 py-2 text-sm font-bold text-brand-primary outline-none focus:ring-2 focus:ring-brand-primary/20"
+                        />
+                        <button onClick={() => submitEdit(post.id)} className="w-8 h-8 flex items-center justify-center rounded-full bg-brand-primary text-white hover:bg-brand-primary/80 transition-colors shrink-0">
+                          <Check size={14} />
+                        </button>
+                        <button onClick={() => setEditingPostId(null)} className="w-8 h-8 flex items-center justify-center rounded-full bg-brand-surface text-brand-primary/40 hover:bg-brand-surface/80 transition-colors shrink-0">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-brand-primary font-bold text-base leading-relaxed">{post.text}</p>
+                    )}
                   </div>
 
-                  {/* 하트 */}
-                  <button
-                    onClick={() => handleLike(post.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all shrink-0 ${
-                      liked
-                        ? 'bg-brand-pink/10 border-brand-pink/20 text-brand-pink'
-                        : 'bg-white border-brand-surface text-brand-primary/20 hover:border-brand-pink/30 hover:text-brand-pink'
-                    }`}
-                  >
-                    <Heart size={18} className={liked ? 'fill-brand-pink' : ''} />
-                    <span className="text-sm font-black">{post.likes}</span>
-                  </button>
+                  {/* 액션 버튼 영역 */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* 수정 버튼 (본인 글만) */}
+                    {canEdit && !isEditing && (
+                      <button
+                        onClick={() => startEdit(post)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-brand-surface text-brand-primary/30 hover:bg-brand-primary/10 hover:text-brand-primary/60 transition-all"
+                        title="수정"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                    )}
+                    {/* 삭제 버튼 (본인 또는 강사) */}
+                    {canDelete && !isEditing && (
+                      <button
+                        onClick={() => handleDelete(post.id)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-brand-surface text-brand-primary/30 hover:bg-red-50 hover:text-red-400 transition-all"
+                        title="삭제"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                    {/* 하트 */}
+                    <button
+                      onClick={() => handleLike(post.id)}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl border transition-all ${
+                        liked
+                          ? 'bg-brand-pink/10 border-brand-pink/20 text-brand-pink'
+                          : 'bg-white border-brand-surface text-brand-primary/20 hover:border-brand-pink/30 hover:text-brand-pink'
+                      }`}
+                    >
+                      <Heart size={18} className={liked ? 'fill-brand-pink' : ''} />
+                      <span className="text-sm font-black">{post.likes}</span>
+                    </button>
+                  </div>
                 </motion.div>
               );
             })}
