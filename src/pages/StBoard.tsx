@@ -67,60 +67,82 @@ export default function StBoard() {
   const confusedSummary = useMemo(() => {
     if (confusedEntries.length === 0) return null;
 
-    // 모호하거나 무의미한 일반 단어 제외
-    const stopWords = new Set([
-      // 조사
-      '이', '가', '은', '는', '을', '를', '의', '에', '와', '과', '도', '로', '으로', '에서', '에게', '부터', '까지', '만', '랑',
-      // 대명사
-      '나', '제', '저', '우리', '내가', '나는', '저는',
-      // 시간·빈도 부사
-      '오늘', '내일', '어제', '이번', '다음', '지금', '아직', '벌써', '이미', '다시', '또', '항상', '자주', '가끔', '별로',
-      // 정도 부사
-      '너무', '정말', '그냥', '좀', '많이', '더', '안', '못', '잘', '특히', '조금',
-      // 접속사·감탄사
-      '그리고', '그런데', '하지만', '그래서', '근데', '아', '어', '음',
-      // 지시어
-      '이렇게', '저렇게', '그렇게', '이게', '그게', '저게', '여기', '거기',
-      // 의존명사·모호한 명사
-      '것', '수', '때', '점', '부분', '내용', '경우', '곳', '쪽', '거', '뭔가',
-      // 모호한 학습 관련 일반어 (너무 포괄적)
-      '방법', '공부', '학습', '내용', '문제', '개념', '이해', '공부법', '방식', '부분들', '모르',
-      // 동사/형용사 어간
-      '같아', '같은', '있어', '없어', '했어', '잘못', '어려워', '힘들어', '모르겠',
-    ]);
+    // ── 유효 명사 토큰 판별
+    const isValidToken = (word: string): boolean => {
+      const isKorean = /^[가-힣]+$/.test(word);
+      if (isKorean) {
+        if (word.length < 2 || word.length > 6) return false;
+        if (/[어아]요$/.test(word)) return false;
+        if (/습니다$/.test(word)) return false;
+        if (/[겠었]어$/.test(word)) return false;
+        if (/[니죠네지]$/.test(word)) return false;
+        if (/[고며]$/.test(word)) return false;
+        if (/니까$/.test(word)) return false;
+        if (/워$/.test(word)) return false;
+        if (/는$/.test(word)) return false;          // 하는, 되는, 있는 등 관형형
+        if (/다$/.test(word) && word.length <= 3) return false;
+        // 단독으로 쓰일 때 무의미한 단어 (바이그램 구성 시에는 의미 있을 수 있으므로 단일 폴백에서만 차단)
+        const soloBlock = new Set(['없음', '전부', '전체', '모두', '딱히', '특별히', '해당', '없어', '모름', '글쎄', '뭔가', '그냥', '이해', '방법', '공부', '학습']);
+        if (soloBlock.has(word)) return false;
+        return true;
+      }
+      const isEnglish = /^[a-zA-Z]+$/.test(word);
+      if (isEnglish) {
+        if (word.length < 2) return false;
+        if (/^(.)\1+$/.test(word)) return false;
+        return true;
+      }
+      return false;
+    };
 
-    // 단어별로 언급한 userId 목록 수집
+    // 바이그램용 토큰 판별 (단독 차단 단어도 바이그램에서는 허용)
+    const isValidBigramToken = (word: string): boolean => {
+      const isKorean = /^[가-힣]+$/.test(word);
+      if (isKorean) {
+        if (word.length < 2 || word.length > 6) return false;
+        if (/[어아]요$/.test(word)) return false;
+        if (/습니다$/.test(word)) return false;
+        if (/[겠었]어$/.test(word)) return false;
+        if (/[니죠네지]$/.test(word)) return false;
+        if (/[고며]$/.test(word)) return false;
+        if (/니까$/.test(word)) return false;
+        if (/워$/.test(word)) return false;
+        if (/는$/.test(word)) return false;          // 하는, 되는, 있는 등 관형형
+        if (/다$/.test(word) && word.length <= 3) return false;
+        const hardBlock = new Set(['없음', '전부', '전체', '모두', '딱히', '특별히', '해당', '없어', '모름', '글쎄']);
+        if (hardBlock.has(word)) return false;
+        return true;
+      }
+      const isEnglish = /^[a-zA-Z]+$/.test(word);
+      if (isEnglish) {
+        if (word.length < 2) return false;
+        if (/^(.)\1+$/.test(word)) return false;
+        return true;
+      }
+      return false;
+    };
+
+    // 단어별로 언급한 userId 목록 수집 (바이그램 우선, 단일 토큰 폴백)
     const wordUsers: Record<string, Set<number>> = {};
     confusedEntries.forEach(({ userId, text }) => {
-      text.split(/\s+/).forEach((w: string) => {
-        const clean = w.replace(/[^가-힣a-zA-Z]/g, '');
-        if (clean.length < 2) return;
-        if (stopWords.has(clean)) return;
+      const tokens = text.split(/\s+/)
+        .map((w: string) => w.replace(/[^가-힣a-zA-Z]/g, ''))
+        .filter((w: string) => isValidBigramToken(w));
 
-        // 영문: 의미없는 반복 문자열 제외, 2글자 이하 제외
-        const isEnglish = /^[a-zA-Z]+$/.test(clean);
-        if (isEnglish) {
-          if (clean.length < 3) return;
-          if (/^(.)\1+$/.test(clean)) return;
+      if (tokens.length >= 2) {
+        // 연속된 두 토큰을 바이그램으로 추출
+        for (let i = 0; i < tokens.length - 1; i++) {
+          const bigram = `${tokens[i]} ${tokens[i + 1]}`;
+          if (!wordUsers[bigram]) wordUsers[bigram] = new Set();
+          wordUsers[bigram].add(userId);
         }
-
-        // 동사·형용사 어미 제외
-        const isVerb =
-          /다$/.test(clean) ||
-          /[어아][요서]$/.test(clean) ||
-          /[었겠]$/.test(clean) ||
-          /[네지죠]$/.test(clean) ||
-          /[고며]$/.test(clean) ||
-          /니까$/.test(clean) ||
-          /[같한운]$/.test(clean) ||
-          /[던]$/.test(clean) ||
-          /워$/.test(clean) ||     // 어려워, 힘들어
-          /해$/.test(clean);       // 이해해, 공부해
-        if (isVerb) return;
-
-        if (!wordUsers[clean]) wordUsers[clean] = new Set();
-        wordUsers[clean].add(userId);
-      });
+      } else {
+        // 유효 토큰이 1개뿐이면 단일 토큰 사용 (단독 차단 단어는 제외)
+        tokens.filter((w: string) => isValidToken(w)).forEach((w: string) => {
+          if (!wordUsers[w]) wordUsers[w] = new Set();
+          wordUsers[w].add(userId);
+        });
+      }
     });
 
     const sorted = Object.entries(wordUsers).sort((a, b) => b[1].size - a[1].size);

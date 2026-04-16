@@ -283,9 +283,11 @@ export default function InBoard() {
       if (!weeks[w]) weeks[w] = [];
       weeks[w].push(getMetricValue(r, activeMetric));
     });
-    return Object.entries(weeks).map(([week, vals]) => ({
+    return ['1주차', '2주차', '3주차', '4주차', '5주차'].map(week => ({
       week,
-      value: Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10,
+      value: weeks[week]
+        ? Math.round(weeks[week].reduce((a, b) => a + b, 0) / weeks[week].length * 10) / 10
+        : 0,
     }));
   }, [monitoringHistory, activeMetric]);
 
@@ -330,10 +332,13 @@ export default function InBoard() {
       if (!weeks[w]) weeks[w] = [];
       weeks[w].push(r);
     });
-    return Object.entries(weeks).map(([week, rows]) => {
+    return ['1주차', '2주차', '3주차', '4주차', '5주차'].map(week => {
       const point: Record<string, any> = { week };
+      const rows = weeks[week] || [];
       top5EmotionKeys.forEach(k => {
-        point[k] = Math.round(rows.reduce((sum, r) => sum + (parseFloat(r[k]) || 0), 0) / rows.length * 100) / 100;
+        point[k] = rows.length > 0
+          ? Math.round(rows.reduce((sum, r) => sum + (parseFloat(r[k]) || 0), 0) / rows.length * 100) / 100
+          : 0;
       });
       return point;
     });
