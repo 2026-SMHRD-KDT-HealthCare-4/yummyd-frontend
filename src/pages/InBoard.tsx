@@ -237,12 +237,48 @@ export default function InBoard() {
       ? parseFloat(((row.dropout_prob || 0) * 100).toFixed(1))
       : (row[key] || 0);
 
-  const weeklyChartData = useMemo(() =>
-    monitoringHistory.slice(-7).map(r => ({
-      date: new Date(r.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-      value: getMetricValue(r, activeMetric),
-    })),
-  [monitoringHistory, activeMetric]);
+  const weeklyChartData = useMemo(() => {
+    const isCumulativeDays = activeMetric === 'cumulative_days';
+    const isCumulative = isCumulativeDays || activeMetric === 'cumulative_absence_days';
+    const grouped: Record<string, { vals: number[]; count: number; rawDate: string }> = {};
+    monitoringHistory.forEach(r => {
+      const date = new Date(r.createdAt).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+      if (!grouped[date]) grouped[date] = { vals: [], count: 0, rawDate: r.createdAt };
+      grouped[date].vals.push(getMetricValue(r, activeMetric));
+      grouped[date].count += 1;
+      if (new Date(r.createdAt) > new Date(grouped[date].rawDate)) {
+        grouped[date].rawDate = r.createdAt;
+      }
+    });
+    const allDates = Object.entries(grouped).map(([date, { vals, count, rawDate }]) => {
+      const cumulativeMax = Math.max(...vals);
+      const avg = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length * 10) / 10;
+      // 해당 날짜가 속한 월의 1일부터 그 날까지 회고 작성된 고유 일수
+      const thisDate = new Date(rawDate);
+      const thisYear = thisDate.getFullYear();
+      const thisMonth = thisDate.getMonth();
+      const thisDayNum = thisDate.getDate();
+      const daysWithReflections = new Set(
+        monitoringHistory
+          .filter(r => {
+            const rd = new Date(r.createdAt);
+            return rd.getFullYear() === thisYear && rd.getMonth() === thisMonth && rd.getDate() <= thisDayNum;
+          })
+          .map(r => new Date(r.createdAt).getDate())
+      ).size;
+      const monthDays = daysWithReflections;
+      const monthAbsenceDays = thisDayNum - daysWithReflections; // 해당 월 1일~해당일 중 미작성 일수
+      return {
+        date,
+        value: isCumulativeDays ? count : isCumulative ? cumulativeMax : avg,
+        cumulative: isCumulativeDays ? cumulativeMax : null,
+        monthDays,
+        monthAbsenceDays,
+        rawDate,
+      };
+    });
+    return allDates.slice(-7);
+  }, [monitoringHistory, activeMetric]);
 
   // 학습회고 지연시간 전용 Y축 — 데이터 최대값 기준으로 범위/눈금 동적 결정
   const delayMaxVal = useMemo(() =>
@@ -251,9 +287,18 @@ export default function InBoard() {
       : 0,
   [weeklyChartData]);
 
+  // 툴팁 전용: 초 → "N분 N초" 형식
+  const formatDelayTooltip = (v: number) => {
+    const secs = Math.round(v);
+    if (secs < 60) return `${secs}초`;
+    const min = Math.floor(secs / 60);
+    const sec = secs % 60;
+    return sec > 0 ? `${min}분 ${sec}초` : `${min}분`;
+  };
+
   const delayAxisConfig = useMemo(() => {
     const max = delayMaxVal;
-    const formatTick = (v: number) => v < 60 ? `${v}초` : `${v / 60}분`;
+    const formatTick = (v: number) => v < 60 ? `${v}초` : `${Math.round(v / 60)}분`;
 
     if (max <= 60) {
       // 초 단위: 10초 간격
@@ -271,24 +316,36 @@ export default function InBoard() {
   }, [delayMaxVal]);
 
   const monthlyChartData = useMemo(() => {
+    const isCumulativeDays = activeMetric === 'cumulative_days';
+    const isCumulative = isCumulativeDays || activeMetric === 'cumulative_absence_days';
     const now = new Date();
     const cm = now.getMonth(); const cy = now.getFullYear();
     const monthRows = monitoringHistory.filter(r => {
       const d = new Date(r.createdAt);
       return d.getMonth() === cm && d.getFullYear() === cy;
     });
-    const weeks: Record<string, number[]> = {};
+    const weeks: Record<string, { vals: number[]; count: number; dates: Set<number> }> = {};
     monthRows.forEach(r => {
-      const w = `${Math.ceil(new Date(r.createdAt).getDate() / 7)}주차`;
-      if (!weeks[w]) weeks[w] = [];
-      weeks[w].push(getMetricValue(r, activeMetric));
+      const d = new Date(r.createdAt);
+      const w = `${Math.ceil(d.getDate() / 7)}주차`;
+      if (!weeks[w]) weeks[w] = { vals: [], count: 0, dates: new Set() };
+      weeks[w].vals.push(getMetricValue(r, activeMetric));
+      weeks[w].count += 1;
+      weeks[w].dates.add(d.getDate()); // 해당 주차의 고유 날짜 집합
     });
-    return ['1주차', '2주차', '3주차', '4주차', '5주차'].map(week => ({
-      week,
-      value: weeks[week]
-        ? Math.round(weeks[week].reduce((a, b) => a + b, 0) / weeks[week].length * 10) / 10
-        : 0,
-    }));
+    return ['1주차', '2주차', '3주차', '4주차', '5주차'].map(week => {
+      const entry = weeks[week];
+      if (!entry) return { week, value: 0, weekCount: 0, weekUniqueDays: 0 };
+      const maxVal = Math.max(...entry.vals);
+      const avg = Math.round(entry.vals.reduce((a, b) => a + b, 0) / entry.vals.length * 10) / 10;
+      return {
+        week,
+        // 회고작성 누적일: 선 높이는 주차별 제출 건수(N회), 나머지 누적은 MAX, 평균은 AVG
+        value: isCumulativeDays ? entry.count : isCumulative ? maxVal : avg,
+        weekCount: entry.count,
+        weekUniqueDays: entry.dates.size, // 해당 주차 중 회고 작성된 고유 일수
+      };
+    });
   }, [monitoringHistory, activeMetric]);
 
   const activeTab = MONITORING_TABS.find(t => t.key === activeMetric)!;
@@ -1054,13 +1111,47 @@ export default function InBoard() {
                                   domain={delayAxisConfig.domain}
                                 />
                               ) : (
-                                <YAxis tick={{ fontSize: 10, fill: '#2D5A3D66' }} unit={chartUnit} />
+                                <YAxis
+                                  tick={{ fontSize: 10, fill: '#2D5A3D66' }}
+                                  allowDecimals={false}
+                                  tickFormatter={(v: number) =>
+                                    activeMetric === 'cumulative_days' ? `${v}회` : `${v}${chartUnit}`
+                                  }
+                                />
                               )}
                               <Tooltip
-                                formatter={(v: any) => [
-                                  activeMetric === 'EDU_delay_time' ? delayAxisConfig.formatTick(v) : `${v}${chartUnit}`,
-                                  activeTab.label
-                                ]}
+                                labelFormatter={(label: string, payload: any[]) => {
+                                  if (activeMetric === 'cumulative_days' && payload?.[0]?.payload) {
+                                    const { monthDays, rawDate } = payload[0].payload;
+                                    const month = new Date(rawDate).getMonth() + 1;
+                                    return `${label} (${month}월 누적 ${monthDays}일)`;
+                                  }
+                                  return label;
+                                }}
+                                formatter={(v: any, _: any, props: any) => {
+                                  if (activeMetric === 'cumulative_days') {
+                                    const cum = props?.payload?.cumulative;
+                                    return [
+                                      `당일 ${v}회 작성${cum != null ? ` / 누적 ${cum}회` : ''}`,
+                                      activeTab.label
+                                    ];
+                                  }
+                                  if (activeMetric === 'cumulative_absence_days') {
+                                    const { monthAbsenceDays, rawDate } = props?.payload || {};
+                                    const month = rawDate ? new Date(rawDate).getMonth() + 1 : '';
+                                    return [
+                                      <span key="absence">
+                                        <div>{month}월 기준 미작성 {monthAbsenceDays ?? '-'}일</div>
+                                        <div>수강 시작 기준 미작성 {v}일</div>
+                                      </span>,
+                                      ''
+                                    ];
+                                  }
+                                  return [
+                                    activeMetric === 'EDU_delay_time' ? formatDelayTooltip(v) : `${v}${chartUnit}`,
+                                    activeTab.label
+                                  ];
+                                }}
                                 contentStyle={{ borderRadius: 10, fontSize: 11, border: '1px solid #E5E7EB' }}
                               />
                               <Bar dataKey="value" fill={chartColor} radius={[4, 4, 0, 0]} />
@@ -1069,9 +1160,27 @@ export default function InBoard() {
                             <LineChart data={monthlyChartData} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                               <XAxis dataKey="week" tick={{ fontSize: 10, fill: '#2D5A3D66', fontWeight: 700 }} />
-                              <YAxis tick={{ fontSize: 10, fill: '#2D5A3D66' }} unit={chartUnit} />
-                              <Tooltip formatter={(v: any) => [`${v}${chartUnit}`, activeTab.label]}
-                                contentStyle={{ borderRadius: 10, fontSize: 11, border: '1px solid #E5E7EB' }} />
+                              <YAxis
+                                tick={{ fontSize: 10, fill: '#2D5A3D66' }}
+                                allowDecimals={false}
+                                unit={activeMetric === 'cumulative_days' ? '회' : chartUnit}
+                              />
+                              <Tooltip
+                                formatter={(v: any, _: any, props: any) => {
+                                  if (activeMetric === 'cumulative_days') {
+                                    const { weekCount, weekUniqueDays } = props?.payload || {};
+                                    return [
+                                      <span key="monthly-cum">
+                                        <div>회고작성 누적일 {weekUniqueDays}일 (해당 주차 기준)</div>
+                                        <div>누적 {weekCount}회 (해당 주차 기준)</div>
+                                      </span>,
+                                      ''
+                                    ];
+                                  }
+                                  return [`${v}${chartUnit}`, activeTab.label];
+                                }}
+                                contentStyle={{ borderRadius: 10, fontSize: 11, border: '1px solid #E5E7EB' }}
+                              />
                               <Line type="monotone" dataKey="value" stroke={chartColor} strokeWidth={2}
                                 dot={{ r: 4, fill: chartColor, strokeWidth: 0 }} activeDot={{ r: 6 }} />
                             </LineChart>
