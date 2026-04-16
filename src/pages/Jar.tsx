@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { Star, Sparkles, Quote, History, BrainCircuit, Package, Gamepad2, BookOpen, Heart, ChevronRight, RefreshCw, Pencil, Check, X, Calendar, Flame, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
@@ -7,6 +8,7 @@ import axios from 'axios';
 
 export default function Jar() {
   const { user, emotions = [], collection = [], streakDays, fetchHistory, fetchMe, fetchCollection, drawItem, toggleEquip } = useStore();
+  const location = useLocation();
 
   // 탭 상태
   const [activeTab, setActiveTab] = useState<'edu' | 'emo'>('edu');
@@ -68,7 +70,7 @@ export default function Jar() {
       fetchMe();
       fetchCollection();
     }
-  }, [user?.id]);
+  }, [user?.id, location.key]);
 
   useEffect(() => {
     const equipped = collection.find(i => i.is_equipped);
